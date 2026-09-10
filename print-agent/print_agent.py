@@ -1,28 +1,37 @@
 #!/usr/bin/env python3
 """
-Grok Bot Austin — local print agent.
+Grok Bot Austin — local print agent (v1.0.6).
 
 Runs on the booth laptop. Polls the web app for queued badges, downloads each
 1-bit label PNG, and prints it on a Phomemo M110 over Bluetooth LE. Auto-print
 is on by default; pause it from the /booth dashboard.
 
+Feed safety (v1.0.6): PNG height is ground truth — never letterbox a shorter PNG
+onto a taller canvas. Gap media (MEDIA=0x0a) applies SAFE_GAP_DOTS (default 24)
+so a 40×20 / 320×160 job sends ≤136 lines and does not span the next label.
+Trailing all-white rows are stripped after packing. RASTER_TRIM defaults to 0.
+Disconnect after footer counts as success; PRINT_ATTEMPTS defaults to 1.
+
     export BOOTH_URL=https://grokbotaustin.vercel.app
     export BOOTH_TOKEN=austin-gtm-2026
     export PHOMEMO_ADDR=q450E5CQ7550085      # BLE name (serial) or MAC/UUID
+    export LABEL=40x20
+    export MEDIA=0x0a                       # 0x0a gap labels · 0x0b continuous
+    export SAFE_GAP_DOTS=24
     python3 print_agent.py
 
 Options:
     --dry-run       don't touch Bluetooth; save labels to ./out and mark printed
     --once          process the queue once and exit
     --scan          list nearby BLE devices and exit
-    --test          print a test label and exit
+    --test          print a test label and exit (holds the same single-instance lock)
     --label 40x20   label size in mm (default 40x20 → 320×160 dots)
     --density 15    1 (light) .. 15 (dark)
 
 Protocol notes (M110, reverse-engineered by phomemo-tools / phomymo / pyphomemo):
     speed   : 1b 4e 0d <speed>
     density : 1b 4e 04 <density>
-    media   : 1f 11 0a                 (labels with gaps)
+    media   : 1f 11 <MEDIA>            (0x0a = gap labels, 0x0b = continuous)
     raster  : 1d 76 30 00 <wBytes LE16=width//8> <lines LE16> <bitmap, 1 = black>
     footer  : 1f f0 05 00 1f f0 03 00
 GATT: service 0xff00, write 0xff02, notify 0xff03, 128-byte chunks.
@@ -46,7 +55,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.5"
+VERSION = "1.0.6"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -73,6 +82,25 @@ PX_PER_MM = 8
 # Print head max is 384 dots; for a label use width_bytes = width // 8 (e.g. 40 for 40x20).
 # Do NOT pad rows to 48 — that caused vertical stripes on Kris's M110 (pyphomemo ground truth).
 HEAD_WIDTH = 384
+
+# Media type byte for 1f 11 <media>: gap-die-cut (0x0a) vs continuous (0x0b).
+def _parse_media(raw: str | None) -> int:
+    s = (raw or "0x0a").strip().lower()
+    try:
+        return int(s, 0) & 0xFF
+    except ValueError:
+        return 0x0A
+
+MEDIA = _parse_media(os.environ.get("MEDIA", "0x0a"))
+MEDIA_GAP = 0x0A
+MEDIA_CONTINUOUS = 0x0B
+# Leave this many dots unused at the bottom of gap stock so the head does not
+# overrun into the next label before the gap sensor re-syncs.
+SAFE_GAP_DOTS = max(0, int(os.environ.get("SAFE_GAP_DOTS", "24")))
+# Optional blind trim after white-strip + safe-gap (default off — prefer those).
+RASTER_TRIM = max(0, int(os.environ.get("RASTER_TRIM", "0")))
+PRINT_ATTEMPTS = max(1, int(os.environ.get("PRINT_ATTEMPTS", "1")))
+MIN_RASTER_LINES = 32
 
 
 # --------------------------------------------------------------------------- log
@@ -151,33 +179,147 @@ def parse_label(spec: str) -> tuple[int, int]:
     return w, h
 
 
+def _usable_png_width(png_w: int) -> bool:
+    """True when PNG width can drive the raster without letterboxing height."""
+    return png_w % 8 == 0 and 8 <= png_w <= HEAD_WIDTH
+
+
+def fit_gray_to_label(gray, width: int, height: int):
+    """Fit grayscale to label dots. PNG height is ground truth — never pad up.
+
+    If PNG width matches the configured width (or is a multiple of 8 ≤ 384):
+      use min(png.height, configured_height); do not letterbox onto a taller canvas.
+    If PNG is taller than configured: scale-to-fit width, then crop/cap height.
+    Otherwise: scale-to-fit inside (width, height) without expanding past PNG needs
+    when the result is already shorter than configured height.
+    """
+    from PIL import Image
+
+    png_w, png_h = gray.size
+    if _usable_png_width(png_w) and (png_w == width or png_w != width):
+        # Usable PNG width: prefer native pixels; never invent taller canvas.
+        if png_w == width and png_h <= height:
+            return gray  # exact / shorter — keep PNG height
+        if png_w == width and png_h > height:
+            # Taller than stock: crop after any mild scale (width already matches).
+            return gray.crop((0, 0, width, height))
+        # Different but legal width (e.g. 240): scale to configured width, cap height.
+        scale = width / png_w
+        new_h = max(1, round(png_h * scale))
+        resized = gray.resize((width, new_h), Image.LANCZOS)
+        if new_h > height:
+            return resized.crop((0, 0, width, height))
+        return resized  # shorter than configured — do NOT pad
+
+    # Fallback: scale to fit width, then crop/cap height (still no vertical pad).
+    scale = width / max(1, png_w)
+    new_h = max(1, round(png_h * scale))
+    resized = gray.resize((width, new_h), Image.LANCZOS)
+    if new_h > height:
+        return resized.crop((0, 0, width, height))
+    return resized
+
+
+def strip_trailing_white_rows(
+    raster: bytes, width_bytes: int, min_lines: int = MIN_RASTER_LINES
+) -> tuple[bytes, int]:
+    """Drop trailing all-zero rows (white after pyphomemo packing). Keep ≥ min_lines."""
+    height = len(raster) // width_bytes
+    while height > min_lines:
+        start = (height - 1) * width_bytes
+        row = raster[start : start + width_bytes]
+        if any(row):
+            break
+        height -= 1
+    return raster[: width_bytes * height], height
+
+
+def apply_height_caps(
+    raster: bytes,
+    height: int,
+    width_bytes: int,
+    label_h: int,
+    media: int,
+    safe_gap_dots: int,
+) -> tuple[bytes, int]:
+    """Cap raster for gap media and optional RASTER_TRIM. Logs the formula."""
+    before = height
+    if media == MEDIA_GAP and safe_gap_dots > 0 and label_h > safe_gap_dots:
+        capped = label_h - safe_gap_dots
+        if height > capped:
+            height = capped
+            raster = raster[: width_bytes * height]
+            log(
+                f"SAFE_GAP_DOTS={safe_gap_dots}: capped {before} → {height} "
+                f"(label_h={label_h}, max={capped})",
+                "info",
+            )
+        else:
+            log(
+                f"SAFE_GAP_DOTS={safe_gap_dots}: height {height} ≤ cap {capped} "
+                f"(label_h={label_h})",
+                "info",
+            )
+    else:
+        # Continuous (or no safe gap): still never exceed configured label height.
+        if height > label_h:
+            height = label_h
+            raster = raster[: width_bytes * height]
+            log(f"continuous/media cap: {before} → {height} (label_h={label_h})", "info")
+
+    trim = RASTER_TRIM
+    if trim and height > trim + MIN_RASTER_LINES:
+        height -= trim
+        raster = raster[: width_bytes * height]
+        log(f"RASTER_TRIM={trim}: height now {height}", "info")
+    return raster, height
+
+
 def png_to_raster(
-    png: bytes, width: int, height: int, threshold: int | None = 128
+    png: bytes,
+    width: int,
+    height: int,
+    threshold: int | None = 128,
+    *,
+    media: int | None = None,
+    safe_gap_dots: int | None = None,
+    label_h: int | None = None,
 ) -> tuple[bytes, int, int]:
     """Return (raster, height, width_bytes) matching pyphomemo image_to_raster.
 
     Invert grayscale so dark ink becomes set bits after Pillow ``"1"`` packing
     (MSB-first). ``width_bytes = width // 8`` — no 48-byte head padding.
+
+    Height rules (v1.0.6):
+      1. Fit PNG without letterboxing onto a taller canvas.
+      2. Strip trailing all-white rows (keep ≥32).
+      3. Gap media: min(h, label_h - SAFE_GAP_DOTS); continuous: min(h, label_h).
+      4. Optional RASTER_TRIM (default 0).
     """
     from PIL import Image, ImageOps  # imported lazily so --scan works without Pillow
 
     if width % 8 != 0:
         raise ValueError("width must be a multiple of 8")
     width_bytes = width // 8
+    media_byte = MEDIA if media is None else media
+    gap_dots = SAFE_GAP_DOTS if safe_gap_dots is None else safe_gap_dots
+    cfg_h = height if label_h is None else label_h
 
     img = Image.open(io.BytesIO(png))
     if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
         bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
         img = Image.alpha_composite(bg, img.convert("RGBA"))
     gray = img.convert("L")
+    png_w, png_h = gray.size
+    log(f"PNG {png_w}×{png_h} · label cfg {width}×{cfg_h} · media 0x{media_byte:02x}", "info")
 
-    if gray.size != (width, height):
-        scale = min(width / gray.width, height / gray.height)
-        new = (max(1, round(gray.width * scale)), max(1, round(gray.height * scale)))
-        resized = gray.resize(new, Image.LANCZOS)
-        canvas = Image.new("L", (width, height), 255)
-        canvas.paste(resized, ((width - new[0]) // 2, (height - new[1]) // 2))
-        gray = canvas
+    gray = fit_gray_to_label(gray, width, cfg_h)
+    if gray.width != width:
+        raise ValueError(f"fit produced width {gray.width}, expected {width}")
+    # Hard rule: never taller than configured stock, never padded above PNG needs.
+    if gray.height > cfg_h:
+        gray = gray.crop((0, 0, width, cfg_h))
+    log(f"fitted gray {gray.width}×{gray.height} (no letterbox pad)", "info")
 
     # Invert so dark input -> high value -> set bit after "1" conversion (pyphomemo).
     inverted = ImageOps.invert(gray)
@@ -193,12 +335,21 @@ def png_to_raster(
             f"unexpected raster length {len(raster)}; "
             f"expected {width_bytes * out_height} for {width}x{out_height}"
         )
-    # Tiny trim only — 40×20 stock is 160 dots tall, so height now matches the media.
-    # Overshoot/gap-hunt was from printing 240-tall artwork on 20mm labels.
-    trim = max(0, min(24, int(os.environ.get("RASTER_TRIM", "16"))))
-    if trim and out_height > trim + 32:
-        out_height -= trim
-        raster = raster[: width_bytes * out_height]
+
+    stripped_h = out_height
+    raster, out_height = strip_trailing_white_rows(raster, width_bytes)
+    if out_height != stripped_h:
+        log(f"stripped trailing white: {stripped_h} → {out_height} lines", "info")
+
+    raster, out_height = apply_height_caps(
+        raster, out_height, width_bytes, cfg_h, media_byte, gap_dots
+    )
+    log(
+        f"final raster {out_height} lines × {width_bytes}B "
+        f"({len(raster)} bytes) · formula min(fit, strip, "
+        f"{'label_h-SAFE_GAP' if media_byte == MEDIA_GAP else 'label_h'})",
+        "ok",
+    )
     return raster, out_height, width_bytes
 
 
@@ -265,6 +416,7 @@ class Printer:
         self.info: PrinterInfo | None = None
         self.write_char = WRITE_CHAR_UUID
         self._write_with_response: bool | None = None
+        self._footer_sent = False
         self.state = "disconnected"
 
     # -- discovery -----------------------------------------------------------
@@ -415,13 +567,14 @@ class Printer:
             await self.connect()
         if len(raster) != width_bytes * height:
             raise ValueError(f"raster {len(raster)} bytes != {width_bytes}*{height}")
+        self._footer_sent = False
         mode = f"no-response + {CHUNK_DELAY*1000:.0f}ms" if self._supports_no_response() else "with-response"
         log(f"sending {len(raster)} bytes ({height} lines × {width_bytes}B) · {mode}", "print")
         await self._write(b"\x1b\x4e\x0d" + bytes([self.speed]))
         await asyncio.sleep(DELAY_INIT)
         await self._write(b"\x1b\x4e\x04" + bytes([self.density]))
         await asyncio.sleep(DELAY_INIT)
-        await self._write(b"\x1f\x11\x0a")
+        await self._write(b"\x1f\x11" + bytes([MEDIA]))
         await asyncio.sleep(DELAY_INIT)
         await self._write(b"\x1d\x76\x30\x00" + _u16(width_bytes) + _u16(height))
         n_chunks = (len(raster) + CHUNK_SIZE - 1) // CHUNK_SIZE
@@ -439,6 +592,7 @@ class Printer:
         if not self.connected:
             raise RuntimeError("printer disconnected before footer")
         await self._write(b"\x1f\xf0\x05\x00\x1f\xf0\x03\x00")
+        self._footer_sent = True
         # Drain OS BLE TX queue + let the head finish before we tear down GATT.
         log(f"footer sent · draining {DELAY_AFTER_FOOTER:.1f}s…", "ble")
         await asyncio.sleep(DELAY_AFTER_FOOTER)
@@ -585,14 +739,18 @@ class Agent:
             self.heartbeat(f"failed: {msg}", force=True)
             return False
 
-    async def print_with_retry(self, raster: bytes, height: int, width_bytes: int, attempts: int = 2):
+    async def print_with_retry(self, raster: bytes, height: int, width_bytes: int, attempts: int | None = None):
         assert self.printer is not None
+        attempts = PRINT_ATTEMPTS if attempts is None else max(1, attempts)
         last = None
         for i in range(1, attempts + 1):
             try:
                 await self.printer.print_raster(raster, height, width_bytes)
                 return
             except Exception as exc:  # noqa: BLE001
+                if getattr(self.printer, "_footer_sent", False):
+                    log(f"post-footer error ignored (job already accepted): {exc}", "warn")
+                    return
                 last = exc
                 log(f"print attempt {i}/{attempts} failed: {exc}", "warn")
                 await self.printer.disconnect()
@@ -603,7 +761,11 @@ class Agent:
     async def run(self):
         log(f"grokbot print agent v{VERSION} on {platform.system()} · {self.agent_name}")
         log(f"booth  {self.booth.base}")
-        log(f"label  {self.args.label} mm → {self.width}×{self.height} dots · density {self.args.density}")
+        cap = max(MIN_RASTER_LINES, self.height - SAFE_GAP_DOTS) if MEDIA == MEDIA_GAP else self.height
+        log(
+            f"label  {self.args.label} mm → {self.width}×{self.height} dots · "
+            f"media 0x{MEDIA:02x} · safe-cap {cap} · density {self.args.density}"
+        )
         if self.args.dry_run:
             log(f"DRY RUN · labels saved to {self.out_dir}", "warn")
         else:
@@ -705,7 +867,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     # Single-instance lock so accidental double-launch (or forked shells) cannot dual-print.
-    if not args.scan and not args.test:
+    if not args.scan:
         import fcntl
         lock_path = Path(__file__).parent / ".print-agent.lock"
         lock_fh = open(lock_path, "a+")
