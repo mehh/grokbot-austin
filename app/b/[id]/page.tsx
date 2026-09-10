@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { LiveAvatar } from "@/components/LiveAvatar";
 import { BadgeActions } from "@/components/BadgeActions";
 import { PrintStatus } from "@/components/PrintStatus";
-import { ShareX, shareText } from "@/components/ShareX";
+import { ShareX } from "@/components/ShareX";
+import { shareText } from "@/lib/share";
 import { SparkBurst } from "@/components/SparkBurst";
 import { flairFor } from "@/lib/flair";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
@@ -45,7 +46,7 @@ export default async function BadgePage({ params, searchParams }: { params: Para
         <>
           <SparkBurst count={flair.rarity === "legendary" ? 60 : 30} />
           <div className="mb-6 animate-rise rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm">
-            <span className="font-bold">Claimed.</span> Your badge is in the print queue — head to the booth table.
+            <span className="font-bold">Claimed.</span> Your badge is in the print queue. At the event: grab it at the booth. Remote: you're done.
             {flair.rarity === "legendary" ? <span className="ml-2 font-bold">You pulled a LEGENDARY. Tell everyone.</span> : null}
           </div>
         </>

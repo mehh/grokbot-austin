@@ -2,11 +2,6 @@
 
 import { CopyButton } from "./CopyButton";
 
-export function shareText(rarity: string, botName: string): string {
-  const flex = rarity === "legendary" ? " It's LEGENDARY. 1-in-20." : rarity === "rare" ? " Pulled a RARE." : "";
-  return `Just printed my Grok Bot badge at #GrokBotAustin 🤖 Meet ${botName}.${flex}`;
-}
-
 export function ShareX({ text, url }: { text: string; url: string }) {
   const intent = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
   return (

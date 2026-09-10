@@ -31,7 +31,7 @@ export async function POST(req: Request) {
         jobId: job.id,
         status: job.status,
         ...urls,
-        message: `Badge queued for ${badge.name} × ${badge.botName}. It's printing at the booth — open previewUrl to watch.`,
+        message: `Badge queued for ${badge.name} × ${badge.botName}. Open previewUrl to watch status — the booth printer picks it up when the agent is online.`,
         badge: {
           personName: badge.name,
           botName: badge.botName,

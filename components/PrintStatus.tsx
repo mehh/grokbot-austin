@@ -20,9 +20,9 @@ interface Agent {
 
 const COPY: Record<Status, { label: string; hint: string; dot: string }> = {
   loading: { label: "Checking the queue…", hint: "", dot: "bg-neutral-500 animate-pulse-soft" },
-  queued: { label: "Print queued", hint: "The booth printer grabs jobs in order. Usually under 10s.", dot: "bg-warn animate-pulse-soft" },
+  queued: { label: "Print queued", hint: "The booth printer grabs jobs in order when the agent is online. Usually under 10s.", dot: "bg-warn animate-pulse-soft" },
   printing: { label: "Printing…", hint: "Listen for the little thermal whirr.", dot: "bg-white animate-pulse-soft" },
-  printed: { label: "Printed ✓", hint: "Grab it at the booth. Peel, stick, photograph.", dot: "bg-ok" },
+  printed: { label: "Printed ✓", hint: "At the event: grab it at the booth. Remote: you're done — peel, stick, photograph.", dot: "bg-ok" },
   failed: { label: "Print failed", hint: "Wave at the booth host — they can reprint from the dashboard.", dot: "bg-bad" },
   missing: {
     label: "Not in the live queue",
