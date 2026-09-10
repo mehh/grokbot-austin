@@ -390,24 +390,25 @@ function JobRow({
     failed: "text-bad border-bad/40",
   };
   return (
-    <li className={`card animate-flash flex items-center gap-3 p-3 ${compact ? "opacity-80" : ""}`}>
+    <li className={`card animate-flash flex flex-wrap items-center gap-3 p-3 ${compact ? "opacity-80" : ""}`}>
       {typeof index === "number" ? <span className="w-5 text-right text-[11px] text-dim tabular-nums">{index + 1}</span> : null}
       <Avatar botName={job.botName} personName={job.name} size={compact ? 32 : 44} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1 basis-40">
+        <div className="flex min-w-0 items-center gap-2">
           <span className="truncate text-sm font-bold">{job.name}</span>
-          <span className="truncate text-xs text-neutral-400">× {job.botName}</span>
+          <span className="hidden truncate text-xs text-neutral-400 sm:inline">× {job.botName}</span>
           {job.source === "bot" ? <span className="rounded border border-line px-1 text-[9px] tracking-widest text-muted uppercase">bot</span> : null}
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-dim">
-          {job.title ? <span className="truncate">{job.title}</span> : null}
+          <span className="truncate text-neutral-400 sm:hidden">× {job.botName}</span>
+          {job.title ? <span className="hidden truncate sm:inline">{job.title}</span> : null}
           <span>{new Date(job.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
           {job.attempts > 1 ? <span>· try {job.attempts}</span> : null}
           {job.error ? <span className="text-bad">· {job.error}</span> : null}
         </div>
       </div>
       <span className={`rounded-full border px-2 py-0.5 text-[10px] tracking-[0.12em] uppercase ${chip[job.status]}`}>{job.status}</span>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 basis-full items-center justify-end gap-1 sm:basis-auto">
         {job.status === "queued" || job.status === "printing" ? (
           <>
             <button type="button" disabled={busy} onClick={() => onAct(job, "complete")} className="btn-ghost btn-sm" title="Mark printed (if you printed it another way)">
