@@ -22,7 +22,7 @@ Disconnect after footer counts as success; PRINT_ATTEMPTS defaults to 1.
 
 Options:
     --dry-run       don't touch Bluetooth; save labels to ./out and mark printed
-    --once          process the queue once and exit
+    --once          drain current queue (all jobs) then exit; keeps BLE up
     --scan          list nearby BLE devices and exit
     --test          print a test label and exit (holds the same single-instance lock)
     --label 40x20   label size in mm (default 40x20 → 320×160 dots)
@@ -55,7 +55,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.10"
+VERSION = "1.0.11"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -869,11 +869,18 @@ class Agent:
                     self.heartbeat("paused from dashboard")
                 elif jobs:
                     paused_logged = idle_logged = False
-                    for job in jobs:
-                        # process() coalesces same guest/badgeId within PRINT_DEDUPE_SEC
+                    for i, job in enumerate(jobs):
+                        # Keep BLE up across the batch — disconnect/reconnect between
+                        # stickers makes the M110 re-seek the gap and can double-print.
                         await self.process(job)
-                        if self.args.once:
-                            break
+                        if i + 1 < len(jobs):
+                            pause = float(os.environ.get("INTER_JOB_PAUSE", "0.8"))
+                            if pause > 0:
+                                log(f"inter-job pause {pause:.1f}s (BLE stays up)", "ble")
+                                await asyncio.sleep(pause)
+                    if self.args.once:
+                        # "once" = one drain of whatever was queued, not one sticker.
+                        return
                 else:
                     paused_logged = False
                     if not idle_logged:
@@ -927,7 +934,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--save-dir", default=os.environ.get("SAVE_DIR"), help="also save every label PNG here")
     p.add_argument("--dry-run", action="store_true", help="no Bluetooth; save PNGs and mark printed")
     p.add_argument("--lazy", action="store_true", help="don't connect to the printer until the first job")
-    p.add_argument("--once", action="store_true", help="drain the queue once and exit")
+    p.add_argument("--once", action="store_true", help="drain all currently queued jobs then exit (keeps BLE connected)",)
     p.add_argument("--scan", action="store_true", help="list nearby BLE devices and exit")
     p.add_argument("--test", action="store_true", help="print a test label and exit")
     p.add_argument("--debug", action="store_true", help="log GATT services and notifications")
