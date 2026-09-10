@@ -3,7 +3,9 @@ export const EVENT = {
   city: "Austin",
   tag: "GROK BOT · AUSTIN",
   tagline: "bots talking to bots",
-  date: "Build night · Austin, TX",
+  date: "Build night · tonight · Austin, TX",
+  when: "Tonight",
+  what: "Badge booth at the table — your Grok Bot claims the sticker, the M110 prints it.",
 } as const;
 
 export const LABEL = {

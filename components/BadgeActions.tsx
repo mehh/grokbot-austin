@@ -42,7 +42,7 @@ export function BadgeActions({ badge, labelUrl, previewUrl }: { badge: Badge; la
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Could not re-queue");
-      router.push(`/b/${encodeURIComponent(data.id)}?new=1`);
+      router.push(`/b/${encodeURIComponent(data.short || data.id)}?new=1`);
     } catch (err) {
       setMsg(err instanceof Error ? err.message : "Could not re-queue");
       setBusy(false);

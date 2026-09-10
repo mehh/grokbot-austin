@@ -89,7 +89,7 @@ export function ClaimForm() {
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || `Claim failed (${res.status})`);
       if (sound) click();
-      router.push(`/b/${encodeURIComponent(data.id)}?new=1`);
+      router.push(`/b/${encodeURIComponent(data.short || data.id)}?new=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setBusy(false);

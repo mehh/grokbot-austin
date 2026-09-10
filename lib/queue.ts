@@ -1,6 +1,7 @@
 import "server-only";
 import { badgeUrls, type Badge } from "./badge";
 import { baseUrl } from "./config";
+import { ensureShortCode } from "./short";
 import { getStore, type Job } from "./store";
 
 export function jobIdFor(badge: Badge): string {
@@ -41,9 +42,11 @@ export async function enqueueBadge(badge: Badge): Promise<Job> {
     if (retry) return retry;
   }
 
+  const short = await ensureShortCode(badge.id);
   const job: Job = {
     id: jobIdFor(badge),
     badgeId: badge.id,
+    short,
     name: badge.name,
     botName: badge.botName,
     title: badge.title,
@@ -64,7 +67,8 @@ export interface JobView extends Job {
 
 export function viewJob(job: Job, origin = baseUrl()): JobView {
   const urls = badgeUrls(job.badgeId, origin);
-  return { ...job, ...urls };
+  const previewUrl = job.short ? `${origin}/b/${job.short}` : urls.previewUrl;
+  return { ...job, ...urls, previewUrl };
 }
 
 /**

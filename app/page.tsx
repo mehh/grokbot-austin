@@ -43,11 +43,14 @@ export default function LandingPage() {
             <br />
             to bots<span className="cursor" />
           </h1>
-          <p className="mt-6 max-w-xl text-sm leading-relaxed text-neutral-300 sm:text-base">
-            Here&apos;s the trick: you don&apos;t fill in a form. <em className="text-white not-italic">Your Grok Bot does.</em> Copy one
-            prompt, paste it to your bot, and it negotiates a badge for both of you — its own title, a one-liner, a handshake with the
-            host bot — then the printer at the table spits it out. Every badge carries a conversation starter and a rarity roll.
-            About 1 in 20 is <span className="text-white">LEGENDARY</span>.
+          <p className="mt-5 text-sm font-bold tracking-tight text-white sm:text-base">
+            {EVENT.date} · badge booth at the table
+          </p>
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-neutral-300 sm:text-base">
+            Don&apos;t fill in a form. <em className="text-white not-italic">Make your Grok Bot claim the sticker.</em> Copy the
+            prompt, paste it to your bot — it picks a title, writes a one-liner, handshakes {HOST_BOT} — and the M110 on this table
+            prints a 40×20mm badge with an icebreaker on it. About 1 in 20 is{" "}
+            <span className="text-white">LEGENDARY</span>. Peel, stick, talk to someone.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -67,7 +70,7 @@ export default function LandingPage() {
         </div>
 
         <div className="hidden justify-self-end lg:block">
-          <QR value={origin} size={180} caption="scan → this page" />
+          <QR value={origin} size={180} caption="scan → tonight's booth" />
         </div>
       </section>
 
@@ -97,15 +100,15 @@ export default function LandingPage() {
       <section className="mx-auto w-full max-w-5xl px-4 py-12">
         <p className="mb-4 text-[11px] tracking-[0.18em] text-muted uppercase">how it works · qr → your grok bot → webapp → print</p>
         <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Step n="01" title="Scan" body="You just did. This page is the booth." />
+          <Step n="01" title="Scan" body="You just did. This page is tonight's booth." />
           <Step n="02" title="Copy the prompt" body="Tap the big button. It goes to your clipboard." />
           <Step
             n="03"
             title="Paste to your bot"
             body={`Your Grok Bot asks for your name, picks its own title, writes one witty line, and POSTs the claim to our API. Optional: it sends a one-line handshake to ${HOST_BOT}, the host bot at the table.`}
           />
-          <Step n="04" title="It prints itself" body="Your bot replies with a link. The booth's M110 picks the job up within seconds and prints a 40×20mm label." />
-          <Step n="05" title="Peel · stick · talk" body="Your label has an icebreaker and a rarity tag. Read someone else's out loud. That's the meetup." />
+          <Step n="04" title="It prints itself" body="Your bot replies with a short link. Walk to the table — the M110 picks the job up within seconds and prints your 40×20mm sticker." />
+          <Step n="05" title="Peel · stick · talk" body="Icebreaker + rarity are on the sticker. Read someone else's out loud. That's the meetup." />
         </ol>
       </section>
 
@@ -138,7 +141,7 @@ export default function LandingPage() {
       <section className="mx-auto w-full max-w-5xl px-4 pb-16 lg:hidden">
         <div className="card flex items-center justify-between gap-4 p-4">
           <div>
-            <div className="text-xs tracking-[0.18em] text-muted uppercase">Share the booth</div>
+            <div className="text-xs tracking-[0.18em] text-muted uppercase">Share tonight&apos;s booth</div>
             <div className="mt-1 text-sm break-all">{origin.replace(/^https?:\/\//, "")}</div>
           </div>
           <QR value={origin} size={96} />

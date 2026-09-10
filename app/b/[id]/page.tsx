@@ -10,7 +10,8 @@ import { SparkBurst } from "@/components/SparkBurst";
 import { flairFor } from "@/lib/flair";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
 import { badgeUrls, decodeBadge } from "@/lib/badge";
-import { EVENT, HOST_BOT } from "@/lib/config";
+import { resolveBadgeId } from "@/lib/short";
+import { EVENT, HOST_BOT, baseUrl } from "@/lib/config";
 import { shortCode } from "@/lib/label";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,8 @@ type Params = Promise<{ id: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { id } = await params;
-  const badge = decodeBadge(decodeURIComponent(id));
+  const fullId = (await resolveBadgeId(id)) ?? decodeURIComponent(id);
+  const badge = decodeBadge(fullId);
   if (!badge) return { title: "Badge not found" };
   const { labelUrl } = badgeUrls(badge.id);
   return {
@@ -32,9 +34,12 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function BadgePage({ params, searchParams }: { params: Params; searchParams: Promise<{ new?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
-  const badge = decodeBadge(decodeURIComponent(id));
+  const param = decodeURIComponent(id);
+  const fullId = (await resolveBadgeId(id)) ?? param;
+  const badge = decodeBadge(fullId);
   if (!badge) notFound();
-  const { previewUrl } = badgeUrls(badge.id);
+  const urls = badgeUrls(badge.id);
+  const previewUrl = param.includes(".") ? urls.previewUrl : `${baseUrl()}/b/${param}`;
   const labelPath = `/api/label/${encodeURIComponent(badge.id)}.png`;
   const spec = avatarSpec(badge.botName, badge.name);
   const flair = flairFor(badge.botName, badge.name);

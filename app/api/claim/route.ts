@@ -1,5 +1,6 @@
 import { BadgeError, badgeUrls, createBadge } from "@/lib/badge";
 import { isAuthorized, json, readJson } from "@/lib/auth";
+import { baseUrl } from "@/lib/config";
 import { clientKey, enqueueBadge, rateLimit } from "@/lib/queue";
 
 export const runtime = "nodejs";
@@ -24,14 +25,17 @@ export async function POST(req: Request) {
     const badge = createBadge({ ...body, source: fromBot || body.source === "bot" ? "bot" : "human" });
     const job = await enqueueBadge(badge);
     const urls = badgeUrls(badge.id);
+    const previewUrl = job.short ? `${baseUrl()}/b/${job.short}` : urls.previewUrl;
     return json(
       {
         ok: true,
         id: badge.id,
+        short: job.short,
         jobId: job.id,
         status: job.status,
         ...urls,
-        message: `Badge queued for ${badge.name} × ${badge.botName}. Open previewUrl to watch status — the booth printer picks it up when the agent is online.`,
+        previewUrl,
+        message: `Badge queued for ${badge.name} × ${badge.botName}. It's printing at the booth — open previewUrl and head to the table.`,
         badge: {
           personName: badge.name,
           botName: badge.botName,

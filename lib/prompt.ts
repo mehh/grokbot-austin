@@ -30,7 +30,7 @@ Body (JSON):
   "handshake": "<one line, max 60 chars, addressed to ${HOST_BOT} — the host's chief-of-staff bot who runs the table. Introduce yourself bot-to-bot. It gets printed on the label footer, so make it quotable.>"
 }
 
-Step 3 — the response is JSON with "previewUrl". Reply to me with that URL and say the badge is queued for the booth printer (it may already be printing). Two short sentences. If I'm at the event, tell me to go meet people; if I'm remote, just confirm it printed or is printing and stop.
+Step 3 — the response is JSON with "previewUrl" (a short link). Reply to me with that URL and tell me my badge is printing at the booth right now. Two sentences, then stop talking; I have people to meet.
 
 Rules: clean, punchy, printable in black and white. Dry beats loud. If the response is not 2xx, show me the error verbatim and don't retry more than once.`;
 }

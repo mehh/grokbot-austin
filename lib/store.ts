@@ -7,6 +7,8 @@ export type JobStatus = "queued" | "printing" | "printed" | "failed";
 export interface Job {
   id: string;
   badgeId: string;
+  /** Public short code for /b/<short> links. */
+  short?: string;
   name: string;
   botName: string;
   title?: string;
@@ -46,6 +48,9 @@ export interface Store {
   setAgent(status: AgentStatus): Promise<void>;
   /** Atomic short-lived lock. Returns true if this caller won the window. */
   tryClaimDedupe(key: string, ttlMs: number): Promise<boolean>;
+  /** Map a short public code ↔ full signed badge id (TTL ~7d). */
+  putShort(code: string, badgeId: string): Promise<void>;
+  getShort(code: string): Promise<string | null>;
 }
 
 const DEFAULT_SETTINGS: Settings = { autoPrint: true };
@@ -55,6 +60,7 @@ const MAX_JOBS = 500;
 
 interface MemState {
   jobs: Map<string, Job>;
+  shorts: Map<string, string>;
   settings: Settings;
   agent: AgentStatus | null;
 }
@@ -62,7 +68,7 @@ interface MemState {
 function memState(): MemState {
   const g = globalThis as unknown as { __grokbotStore?: MemState };
   if (!g.__grokbotStore) {
-    g.__grokbotStore = { jobs: new Map(), settings: { ...DEFAULT_SETTINGS }, agent: null };
+    g.__grokbotStore = { jobs: new Map(), shorts: new Map(), settings: { ...DEFAULT_SETTINGS }, agent: null };
   }
   return g.__grokbotStore;
 }
@@ -113,6 +119,12 @@ function memoryStore(): Store {
       g.__grokbotDedupe.set(key, now + ttlMs);
       return true;
     },
+    async putShort(code, badgeId) {
+      s.shorts.set(code, badgeId);
+    },
+    async getShort(code) {
+      return s.shorts.get(code) ?? null;
+    },
   };
 }
 
@@ -124,6 +136,7 @@ const K = {
   settings: "gb:settings",
   agent: "gb:agent",
   dedupe: (key: string) => `gb:dedupe:${key}`,
+  short: (code: string) => `gb:short:${code}`,
 };
 
 // Atomic status transition: only apply when the current status is in the allowed set.
@@ -204,6 +217,14 @@ function redisStore(redis: Redis): Store {
       // SET NX PX — only the first concurrent claim wins. Upstash returns "OK" | null.
       const res = await redis.set(K.dedupe(key), "1", { nx: true, px: Math.max(1000, ttlMs) });
       return res === "OK";
+    },
+    async putShort(code, badgeId) {
+      // 7 days — long enough for the event + share after
+      await redis.set(K.short(code), badgeId, { ex: 60 * 60 * 24 * 7 });
+    },
+    async getShort(code) {
+      const v = await redis.get<string>(K.short(code));
+      return typeof v === "string" ? v : null;
     },
   };
 }

@@ -26,14 +26,17 @@ export async function POST(req: Request) {
     const badge = createBadge({ ...body, source: "bot" });
     const job = await enqueueBadge(badge);
     const urls = badgeUrls(badge.id);
+    const previewUrl = job.short ? `${baseUrl()}/b/${job.short}` : urls.previewUrl;
     return json(
       {
         ok: true,
         id: badge.id,
+        short: job.short,
         jobId: job.id,
         status: job.status,
         ...urls,
-        message: `Badge queued for ${badge.name}. Open previewUrl to watch it print.`,
+        previewUrl,
+        message: `Badge queued for ${badge.name}. It's printing at the booth — open previewUrl.`,
       },
       { status: 201 },
     );
