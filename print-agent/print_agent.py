@@ -55,7 +55,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.8"
+VERSION = "1.0.9"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -77,7 +77,7 @@ CHUNK_SIZE = 128
 CHUNK_DELAY = float(os.environ.get("CHUNK_DELAY", "0.02"))
 DELAY_INIT = 0.03
 DELAY_BEFORE_FOOTER = float(os.environ.get("DELAY_BEFORE", "0.30"))
-DELAY_AFTER_FOOTER = float(os.environ.get("DELAY_AFTER", "0.50"))
+DELAY_AFTER_FOOTER = float(os.environ.get("DELAY_AFTER", "3.00"))
 PX_PER_MM = 8
 # Print head max is 384 dots; for a label use width_bytes = width // 8 (e.g. 40 for 40x20).
 # Do NOT pad rows to 48 — that caused vertical stripes on Kris's M110 (pyphomemo ground truth).
