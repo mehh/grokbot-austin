@@ -36,9 +36,12 @@ export function viewJob(job: Job, origin = baseUrl()): JobView {
   return { ...job, ...urls };
 }
 
-/** Simple in-memory rate limiter: `limit` hits per `windowMs` per key. Best effort on serverless. */
+/**
+ * Simple in-memory rate limiter: `limit` hits per `windowMs` per key. Best effort on serverless.
+ * Generous by default because a whole venue often shares one NAT IP.
+ */
 const buckets = new Map<string, { count: number; reset: number }>();
-export function rateLimit(key: string, limit = 12, windowMs = 60_000): boolean {
+export function rateLimit(key: string, limit = 60, windowMs = 60_000): boolean {
   const now = Date.now();
   const b = buckets.get(key);
   if (!b || b.reset < now) {
