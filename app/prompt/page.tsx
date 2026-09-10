@@ -65,13 +65,14 @@ export default function PromptPage() {
         <div className="card p-4">
           <h2 className="mb-2 text-sm font-bold text-white">API contract</h2>
           <p>
-            <code className="text-white">POST {origin}/api/agent</code> with header <code className="kbd">x-booth-token</code>.
-            JSON fields: <code className="text-white">name</code>, <code className="text-white">botName</code> (required);{" "}
-            <code className="text-white">title</code>, <code className="text-white">vibe</code>, <code className="text-white">quote</code>{" "}
-            (optional). Returns <code className="text-white">previewUrl</code> and <code className="text-white">labelUrl</code>.
+            <code className="text-white">POST {origin}/api/claim</code> with header <code className="kbd">x-booth-token</code>.
+            JSON fields: <code className="text-white">personName</code>, <code className="text-white">botName</code> (required);{" "}
+            <code className="text-white">botTitle</code>, <code className="text-white">vibe</code>, <code className="text-white">quote</code>,{" "}
+            <code className="text-white">handshake</code> (optional). Returns <code className="text-white">previewUrl</code> and{" "}
+            <code className="text-white">labelUrl</code>.
           </p>
           <p className="mt-2">
-            No token handy? <code className="text-white">POST /api/claim</code> takes the same body and is rate-limited instead.
+            Without the token the same endpoint still works, just rate-limited per device (that&apos;s what the manual form uses).
           </p>
         </div>
         <div className="card p-4">

@@ -6,7 +6,7 @@ import { BadgeActions } from "@/components/BadgeActions";
 import { PrintStatus } from "@/components/PrintStatus";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
 import { badgeUrls, decodeBadge } from "@/lib/badge";
-import { EVENT } from "@/lib/config";
+import { EVENT, HOST_BOT } from "@/lib/config";
 import { shortCode } from "@/lib/label";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +71,11 @@ export default async function BadgePage({ params, searchParams }: { params: Para
               <blockquote className="relative mt-6 border-l-2 border-white/30 pl-4 text-sm leading-relaxed text-neutral-200 italic">
                 “{badge.quote}”
               </blockquote>
+            ) : null}
+            {badge.handshake ? (
+              <p className="relative mt-4 text-xs text-neutral-400">
+                <span className="text-dim">→ {HOST_BOT}:</span> {badge.handshake}
+              </p>
             ) : null}
             <div className="relative mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] tracking-[0.16em] text-dim uppercase">
               <span>{EVENT.tag}</span>

@@ -19,7 +19,11 @@ export const LIMITS = {
   title: 48,
   vibe: 100,
   quote: 160,
+  handshake: 64,
 } as const;
+
+/** Kris's chief-of-staff bot at the table. Guests' bots send it a one-line handshake. */
+export const HOST_BOT = "Chaos Concierge";
 
 export function baseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_BASE_URL?.trim() || "https://grokbotaustin.vercel.app";

@@ -5,7 +5,7 @@
  */
 import type { Badge } from "./badge";
 import { PRINT_COLORS, avatarInner, avatarSpec } from "./avatar";
-import { EVENT, LABEL } from "./config";
+import { EVENT, HOST_BOT, LABEL } from "./config";
 
 export const LABEL_FONT_FAMILY = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
 /** Geist Mono advance width as a fraction of font-size. */
@@ -84,7 +84,8 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const { ink, paper } = PRINT_COLORS;
 
   const pad = 10;
-  const footerH = 30;
+  const handshake = badge.handshake ? fitHandshake(badge.handshake, W - pad * 2 - 16) : null;
+  const footerH = handshake ? 42 : 30;
   const footerY = H - pad - footerH;
   const contentH = footerY - pad;
 
@@ -152,15 +153,29 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   // Footer strip
   const tag = badge.source === "bot" ? "BOT→BOT" : `#${shortCode(badge.id)}`;
   parts.push(`<rect x="${pad}" y="${footerY}" width="${W - pad * 2}" height="${footerH}" rx="4" fill="${ink}"/>`);
+  const mainY = handshake ? footerY + 19 : footerY + footerH / 2 + 5;
   parts.push(
-    `<text x="${pad + 10}" y="${footerY + footerH / 2 + 5}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="14" letter-spacing="1" fill="${paper}">${escapeXml(EVENT.tag)}</text>`,
+    `<text x="${pad + 10}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="14" letter-spacing="1" fill="${paper}">${escapeXml(EVENT.tag)}</text>`,
   );
   parts.push(
-    `<text x="${W - pad - 10}" y="${footerY + footerH / 2 + 4}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="500" font-size="11" letter-spacing="1" fill="${paper}">${escapeXml(tag)}</text>`,
+    `<text x="${W - pad - 10}" y="${mainY - 1}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="500" font-size="11" letter-spacing="1" fill="${paper}">${escapeXml(tag)}</text>`,
   );
+  if (handshake) {
+    parts.push(
+      `<text x="${pad + 8}" y="${footerY + footerH - 8}" font-family="${LABEL_FONT_FAMILY}" font-weight="500" font-size="${handshake.size}" fill="${paper}">${escapeXml(handshake.lines[0] ?? "")}</text>`,
+    );
+  }
 
   const dims = opts.responsive ? 'width="100%" height="100%"' : `width="${W}" height="${H}"`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" ${dims}>${parts.join("")}</svg>`;
+}
+
+/** Prefer the host bot's full name; fall back to initials so the guest's line survives intact. */
+function fitHandshake(text: string, maxWidth: number): Fitted {
+  const full = fitText(`→ ${HOST_BOT}: ${text}`, maxWidth, 10, 8, 1);
+  if (!full.lines[0]?.endsWith("…")) return full;
+  const initials = HOST_BOT.split(/\s+/).map((w) => w[0]).join("");
+  return fitText(`→ ${initials}: ${text}`, maxWidth, 10, 8, 1);
 }
 
 export function shortCode(id: string): string {

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { Badge } from "@/lib/badge";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
-import { LIMITS } from "@/lib/config";
+import { HOST_BOT, LIMITS } from "@/lib/config";
 import { Avatar } from "./Avatar";
 import { LabelPreview } from "./LabelPreview";
 
@@ -18,6 +18,7 @@ export function ClaimForm() {
   const [title, setTitle] = useState("");
   const [vibe, setVibe] = useState("");
   const [quote, setQuote] = useState("");
+  const [handshake, setHandshake] = useState("");
   const [website, setWebsite] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,10 +57,11 @@ export function ClaimForm() {
       title: title.trim() || vibe.trim() || undefined,
       vibe: vibe.trim() || undefined,
       quote: quote.trim() || undefined,
+      handshake: handshake.trim() || undefined,
       source: "human",
       createdAt: 0,
     }),
-    [name, botName, title, vibe, quote],
+    [name, botName, title, vibe, quote, handshake],
   );
 
   const spec = avatarSpec(preview.botName, preview.name);
@@ -79,7 +81,7 @@ export function ClaimForm() {
       const res = await fetch("/api/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, botName, title, vibe, quote, website, source: "human" }),
+        body: JSON.stringify({ personName: name, botName, botTitle: title, vibe, quote, handshake, website, source: "human" }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || `Claim failed (${res.status})`);
@@ -159,6 +161,16 @@ export function ClaimForm() {
             value={quote}
             onChange={(e) => setQuote(e.target.value.slice(0, LIMITS.quote))}
             placeholder="“Book the demo, skip the pleasantries.”"
+          />
+        </Field>
+
+        <Field label={`Handshake to ${HOST_BOT}`} hint="optional · printed on the label footer" count={handshake.length} max={LIMITS.handshake}>
+          <input
+            className="field"
+            value={handshake}
+            onChange={(e) => setHandshake(e.target.value.slice(0, LIMITS.handshake))}
+            placeholder="Your calendar is safe with me."
+            autoComplete="off"
           />
         </Field>
 

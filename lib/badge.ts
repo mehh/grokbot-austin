@@ -10,16 +10,21 @@ export interface Badge {
   title?: string;
   vibe?: string;
   quote?: string;
+  /** One-line handshake from the guest's bot to the host bot; printed in the label footer. */
+  handshake?: string;
   source: BadgeSource;
   createdAt: number;
 }
 
 export interface BadgeInput {
   name?: unknown;
+  personName?: unknown;
   botName?: unknown;
   title?: unknown;
+  botTitle?: unknown;
   vibe?: unknown;
   quote?: unknown;
+  handshake?: unknown;
   source?: unknown;
 }
 
@@ -30,6 +35,7 @@ interface Payload {
   t?: string;
   v?: string;
   q?: string;
+  h?: string;
   s: 0 | 1;
   c: number;
 }
@@ -52,15 +58,17 @@ function clean(value: unknown, max: number): string {
 }
 
 export function normalizeInput(input: BadgeInput): Omit<Badge, "id" | "createdAt"> {
-  const name = clean(input.name, LIMITS.name);
+  // Accept both the documented bot payload (personName/botTitle) and the form's (name/title).
+  const name = clean(input.personName ?? input.name, LIMITS.name);
   const botName = clean(input.botName, LIMITS.botName);
-  if (!name) throw new BadgeError("`name` is required (the human).");
+  if (!name) throw new BadgeError("`personName` is required (the human).");
   if (!botName) throw new BadgeError("`botName` is required (the Grok Bot).");
-  const title = clean(input.title, LIMITS.title) || undefined;
+  const title = clean(input.botTitle ?? input.title, LIMITS.title) || undefined;
   const vibe = clean(input.vibe, LIMITS.vibe) || undefined;
   const quote = clean(input.quote, LIMITS.quote) || undefined;
+  const handshake = clean(input.handshake, LIMITS.handshake) || undefined;
   const source: BadgeSource = input.source === "bot" ? "bot" : "human";
-  return { name, botName, title, vibe, quote, source };
+  return { name, botName, title, vibe, quote, handshake, source };
 }
 
 function b64url(buf: Buffer): string {
@@ -92,6 +100,7 @@ export function createBadge(input: BadgeInput, createdAt = Date.now()): Badge {
   if (data.title) payload.t = data.title;
   if (data.vibe) payload.v = data.vibe;
   if (data.quote) payload.q = data.quote;
+  if (data.handshake) payload.h = data.handshake;
   const body = b64url(Buffer.from(JSON.stringify(payload), "utf8"));
   const id = `${body}.${sign(body)}`;
   return { id, ...data, createdAt };
@@ -116,6 +125,7 @@ export function decodeBadge(id: string): Badge | null {
       title: payload.t || undefined,
       vibe: payload.v || undefined,
       quote: payload.q || undefined,
+      handshake: payload.h || undefined,
       source: payload.s === 1 ? "bot" : "human",
       createdAt: typeof payload.c === "number" ? payload.c : 0,
     };

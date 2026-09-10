@@ -36,6 +36,7 @@ export function BadgeActions({ badge, labelUrl, previewUrl }: { badge: Badge; la
           title: badge.title,
           vibe: badge.vibe,
           quote: badge.quote,
+          handshake: badge.handshake,
           source: badge.source,
         }),
       });

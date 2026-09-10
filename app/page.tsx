@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
+import { CopyButton } from "@/components/CopyButton";
 import { LiveStats } from "@/components/LiveStats";
 import { QR } from "@/components/QR";
-import { baseUrl, EVENT } from "@/lib/config";
+import { baseUrl, boothToken, EVENT, HOST_BOT } from "@/lib/config";
+import { botPrompt } from "@/lib/prompt";
+
+export const dynamic = "force-dynamic";
 
 const SAMPLE_BOTS: Array<[bot: string, human: string]> = [
   ["Ledger", "Kris"],
@@ -21,13 +25,14 @@ const SAMPLE_BOTS: Array<[bot: string, human: string]> = [
 
 export default function LandingPage() {
   const origin = baseUrl();
-  const claimUrl = `${origin}/claim`;
+  const prompt = botPrompt({ origin, token: boothToken() });
 
   return (
     <div className="relative">
       <div className="grid-bg pointer-events-none absolute inset-x-0 top-0 h-[60vh]" aria-hidden />
 
-      <section className="relative mx-auto grid w-full max-w-5xl gap-10 px-4 pt-14 pb-10 sm:pt-20 lg:grid-cols-[1fr_auto] lg:items-center">
+      {/* Hero */}
+      <section className="relative mx-auto grid w-full max-w-5xl gap-10 px-4 pt-12 pb-10 sm:pt-20 lg:grid-cols-[1fr_auto] lg:items-center">
         <div className="animate-rise">
           <p className="mb-4 text-xs text-muted">
             <span className="text-white">$</span> grok-bot claim --event &quot;{EVENT.name}&quot; --city {EVENT.city.toLowerCase()}
@@ -38,23 +43,28 @@ export default function LandingPage() {
             to bots<span className="cursor" />
           </h1>
           <p className="mt-6 max-w-xl text-sm leading-relaxed text-neutral-300 sm:text-base">
-            Tonight&apos;s badge booth prints a thermal label for <em className="text-white not-italic">you and your Grok Bot</em>.
-            Fill in two names, or hand your bot a prompt and let it claim the badge for you. A printer at the table does the
-            rest — peel, stick on your laptop, take the photo.
+            Your Grok Bot claims a thermal badge for <em className="text-white not-italic">both of you</em>. Copy the prompt, paste it
+            to your bot, and the printer at the table does the rest.
           </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href="/claim" className="btn-primary text-base">
-              Claim a badge →
-            </Link>
-            <Link href="/prompt" className="btn-ghost text-base">
-              Send your bot instead
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <CopyButton text={prompt} label="Copy prompt for your Grok Bot" copiedLabel="Copied — paste it to your bot" className="btn-primary text-base sm:min-w-[300px]" />
+            <Link href="/prompt" className="text-xs text-muted underline-offset-2 hover:text-white hover:underline">
+              read the prompt first ↗
             </Link>
           </div>
+          <p className="mt-3 text-xs text-dim">
+            No bot handy?{" "}
+            <Link href="/claim" className="text-neutral-300 underline underline-offset-2 hover:text-white">
+              Use the manual form
+            </Link>
+            .
+          </p>
           <LiveStats className="mt-6" />
         </div>
 
         <div className="hidden justify-self-end lg:block">
-          <QR value={claimUrl} size={180} caption="scan → claim" />
+          <QR value={origin} size={180} caption="scan → this page" />
         </div>
       </section>
 
@@ -73,40 +83,37 @@ export default function LandingPage() {
             ))}
           </div>
         </div>
+        <div className="mx-auto mt-4 flex max-w-5xl justify-center px-4">
+          <Link href="/live" className="text-[11px] tracking-[0.18em] text-muted uppercase hover:text-white">
+            see tonight&apos;s wall of bots →
+          </Link>
+        </div>
       </section>
 
-      {/* How it works */}
-      <section className="mx-auto grid w-full max-w-5xl gap-4 px-4 py-12 sm:grid-cols-3">
-        <Step
-          n="01"
-          title="Claim"
-          body={
-            <>
-              Type your name + your bot&apos;s name at <Link href="/claim" className="underline underline-offset-2">/claim</Link>, or
-              paste the <Link href="/prompt" className="underline underline-offset-2">bot prompt</Link> into Grok and let it POST the
-              claim itself.
-            </>
-          }
-        />
-        <Step
-          n="02"
-          title="Queue → print"
-          body="Your badge lands in the live print queue. A Phomemo M110 at the booth picks it up automatically. Watch the status flip to printed on your preview page."
-        />
-        <Step
-          n="03"
-          title="Peel · stick · post"
-          body="40×30mm, one-bit, high contrast. Looks right on a laptop lid or a shirt. Your bot is generated from your names — same names, same bot, every time."
-        />
+      {/* Guest flow */}
+      <section className="mx-auto w-full max-w-5xl px-4 py-12">
+        <p className="mb-4 text-[11px] tracking-[0.18em] text-muted uppercase">how it works · qr → your grok bot → webapp → print</p>
+        <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <Step n="01" title="Scan" body="You just did. This page is the booth." />
+          <Step n="02" title="Copy the prompt" body="Tap the big button. It goes to your clipboard." />
+          <Step
+            n="03"
+            title="Paste to your bot"
+            body={`Your Grok Bot asks for your name, picks its own title, writes one witty line, and POSTs the claim to our API. Optional: it sends a one-line handshake to ${HOST_BOT}, the host bot at the table.`}
+          />
+          <Step n="04" title="It prints itself" body="Your bot replies with a link. The booth's M110 picks the job up within seconds and prints a 40×30mm label." />
+          <Step n="05" title="Peel · stick · post" body="Laptop lid or shirt. Same names → same blob, every time." />
+        </ol>
       </section>
 
+      {/* Mobile QR share */}
       <section className="mx-auto w-full max-w-5xl px-4 pb-16 lg:hidden">
         <div className="card flex items-center justify-between gap-4 p-4">
           <div>
             <div className="text-xs tracking-[0.18em] text-muted uppercase">Share the booth</div>
             <div className="mt-1 text-sm break-all">{origin.replace(/^https?:\/\//, "")}</div>
           </div>
-          <QR value={claimUrl} size={96} />
+          <QR value={origin} size={96} />
         </div>
       </section>
     </div>
@@ -115,13 +122,13 @@ export default function LandingPage() {
 
 function Step({ n, title, body }: { n: string; title: string; body: React.ReactNode }) {
   return (
-    <div className="card p-5">
-      <div className="mb-3 flex items-center gap-3">
+    <li className="card p-4">
+      <div className="mb-2 flex items-center gap-3">
         <span className="text-[11px] tracking-[0.2em] text-dim">{n}</span>
         <span className="h-px flex-1 bg-line" />
       </div>
-      <h3 className="text-base font-bold">{title}</h3>
-      <p className="mt-2 text-xs leading-relaxed text-neutral-400">{body}</p>
-    </div>
+      <h3 className="text-sm font-bold">{title}</h3>
+      <p className="mt-1.5 text-xs leading-relaxed text-neutral-400">{body}</p>
+    </li>
   );
 }

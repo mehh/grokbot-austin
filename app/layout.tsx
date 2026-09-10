@@ -40,6 +40,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/prompt" className="rounded px-2 py-1 text-neutral-300 hover:bg-neutral-900 hover:text-white">
                 bot prompt
               </Link>
+              <Link href="/live" className="rounded px-2 py-1 text-neutral-300 hover:bg-neutral-900 hover:text-white">
+                live
+              </Link>
               <Link href="/booth" className="rounded px-2 py-1 text-dim hover:bg-neutral-900 hover:text-white">
                 booth
               </Link>

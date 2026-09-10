@@ -6,6 +6,20 @@ Guests (or their Grok Bots) claim a badge → it lands in a print queue → a la
 
 Production: **https://grokbotaustin.vercel.app**
 
+## Guest flow (QR → their Grok Bot → webapp → print)
+
+1. Guest scans the table QR → `https://grokbotaustin.vercel.app` on their phone.
+2. Landing page (dark terminal) has one big CTA: **Copy prompt for your Grok Bot**.
+3. They paste the prompt to *their* Grok Bot. The prompt tells the bot to:
+   - collect their human name, a bot name, a 2–4 word bot title, and one witty line about what it does;
+   - `POST https://grokbotaustin.vercel.app/api/claim` with header `x-booth-token: austin-gtm-2026` and JSON body `{ personName, botName, botTitle, vibe, quote, handshake }`;
+   - reply to the human with the returned `previewUrl` and say the badge is printing at the booth;
+   - optionally invent a one-line **handshake to Chaos Concierge** (Kris's chief-of-staff bot at the table) — it's printed on the label footer.
+4. The webapp signs the badge, enqueues it, and Kris's Mac print agent auto-prints it on the M110 `q450E5CQ7550085` within seconds. The guest watches `queued → printing → printed` on `/b/<id>`.
+5. No bot handy? The **manual form** at `/claim` posts the same payload.
+
+`/live` is a wall of tonight's claims (names + blob avatars, live status) for the booth screen.
+
 ---
 
 ## Event ops in 2 minutes
@@ -69,8 +83,24 @@ npm run print-agent            # first run creates print-agent/.venv and install
 
 ### 4. Tell guests
 
-- Phone: scan the QR on `/` or `/booth` → `/claim` → two names → **Print my badge**. They get `/b/<id>` with a live "queued → printing → printed" status.
-- Bot-to-bot (the party trick): send them to **`/prompt`**. They copy the prompt into their Grok Bot; the bot POSTs `/api/agent` with the token, invents a title + one-liner, and replies with a preview URL. The badge prints itself.
+- Scan the QR → tap **Copy prompt for your Grok Bot** → paste to their bot → open the link it replies with. That's the whole pitch.
+- Manual fallback: `/claim` (two names, optional title/vibe/quote/handshake, live label preview).
+- Put `/live` on a spare screen so the table feels alive.
+
+### 5. Test checklist (before doors open)
+
+```bash
+# via curl (what a bot does)
+curl -s -X POST https://grokbotaustin.vercel.app/api/claim \
+  -H 'Content-Type: application/json' -H 'x-booth-token: austin-gtm-2026' \
+  -d '{"personName":"Kris","botName":"Ledger","botTitle":"Chaos Concierge","vibe":"Turns Slack threads into shipped things","quote":"I read the docs so you do not have to.","handshake":"Ledger here. Your calendar is safe with me."}'
+# → 201 {"ok":true,"status":"queued","previewUrl":"https://grokbotaustin.vercel.app/b/…","labelUrl":"…png"}
+```
+
+1. Open the `previewUrl` on a phone → status card shows **Print queued** → flips to **Printing…** → **Printed ✓** once the agent runs.
+2. `curl -o t.png "<labelUrl>"` → 320×240 1-bit PNG.
+3. Via prompt: on `/`, tap **Copy prompt for your Grok Bot**, paste into Grok, answer its questions, open the link it returns. The claim should appear on `/booth` and `/live` within 3s and print within ~10s.
+4. `/booth`: agent pill green, auto-print ON, **Test print** produces a calibration label.
 
 ---
 
@@ -103,8 +133,9 @@ app/
   prompt/                copy-pasteable bot prompt + curl
   b/[id]/                badge page: avatar, quote, print status, exact label PNG
   booth/                 live ops dashboard
-  api/claim              POST — public claim (rate-limited, honeypot)
-  api/agent              POST — bot claim (x-booth-token) · GET — self-describing
+  live/                  wall of tonight's claims (names + avatars, live status)
+  api/claim              POST — THE claim endpoint: bots (x-booth-token, unlimited) + form (rate-limited)
+  api/agent              POST — alias of /api/claim requiring the token · GET — self-describing
   api/agent/heartbeat    POST — print agent health (token)
   api/label/[file]       GET  — <badgeId>.png → 1-bit PNG (?scale=2 for previews)
   api/queue              GET  — jobs + counts + agent + settings · PATCH — {autoPrint}
