@@ -78,8 +78,7 @@ export default async function BadgePage({ params, searchParams }: { params: Para
                   <RarityChip rarity={flair.rarity} tag={flair.rarityTag} />
                 </div>
                 <h1 className="text-3xl leading-tight font-bold tracking-tight break-words sm:text-5xl">{badge.name}</h1>
-                <div className="mt-3 text-[11px] tracking-[0.2em] text-muted uppercase">Grok Bot ▸</div>
-                <div className="text-xl font-bold break-words sm:text-2xl">{badge.botName}</div>
+                <div className="mt-3 text-xl font-bold break-words sm:text-2xl">{badge.botName}</div>
                 {badge.title ? <div className="mt-1 text-sm text-neutral-300">{badge.title}</div> : null}
                 {badge.vibe ? <p className="mt-3 text-sm leading-relaxed text-neutral-400">{badge.vibe}</p> : null}
               </div>
