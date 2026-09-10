@@ -150,3 +150,6 @@ print-agent/.venv/
 print-agent/out/
 *.pyc
 .env*
+
+# print-agent single-instance lock
+print-agent/.print-agent.lock

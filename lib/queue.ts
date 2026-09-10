@@ -28,6 +28,19 @@ export async function enqueueBadge(badge: Badge): Promise<Job> {
   );
   if (dup) return dup;
 
+  // Concurrent double-POSTs (two serverless invokes at once) race listJobs — use NX lock.
+  const lockKey = `${badge.name.trim().toLowerCase()}|${badge.botName.trim().toLowerCase()}`;
+  const won = await store.tryClaimDedupe(lockKey, CLAIM_DEDUPE_MS);
+  if (!won) {
+    const again = await store.listJobs(40);
+    const existing = again.find((j) => sameGuest(j, badge) && now - j.createdAt < CLAIM_DEDUPE_MS);
+    if (existing) return existing;
+    // Loser arrived first in list but winner's putJob not visible yet — brief wait then re-list.
+    await new Promise((r) => setTimeout(r, 150));
+    const retry = (await store.listJobs(40)).find((j) => sameGuest(j, badge) && Date.now() - j.createdAt < CLAIM_DEDUPE_MS);
+    if (retry) return retry;
+  }
+
   const job: Job = {
     id: jobIdFor(badge),
     badgeId: badge.id,

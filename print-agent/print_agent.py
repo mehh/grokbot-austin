@@ -699,6 +699,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    # Single-instance lock so accidental double-launch (or forked shells) cannot dual-print.
+    if not args.scan and not args.test:
+        import fcntl
+        lock_path = Path(__file__).parent / ".print-agent.lock"
+        lock_fh = open(lock_path, "a+")
+        try:
+            fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            log(f"another print-agent already holds {lock_path} — exiting", "err")
+            return 3
+        lock_fh.seek(0)
+        lock_fh.truncate()
+        lock_fh.write(str(os.getpid()))
+        lock_fh.flush()
+        # keep lock_fh open for process lifetime
+        globals()["_PRINT_AGENT_LOCK_FH"] = lock_fh
     try:
         if args.scan:
             asyncio.run(scan_cmd())

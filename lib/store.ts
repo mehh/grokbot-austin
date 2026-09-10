@@ -44,6 +44,8 @@ export interface Store {
   setSettings(patch: Partial<Settings>): Promise<Settings>;
   getAgent(): Promise<AgentStatus | null>;
   setAgent(status: AgentStatus): Promise<void>;
+  /** Atomic short-lived lock. Returns true if this caller won the window. */
+  tryClaimDedupe(key: string, ttlMs: number): Promise<boolean>;
 }
 
 const DEFAULT_SETTINGS: Settings = { autoPrint: true };
@@ -102,6 +104,15 @@ function memoryStore(): Store {
     async setAgent(status) {
       s.agent = status;
     },
+    async tryClaimDedupe(key, ttlMs) {
+      const g = globalThis as unknown as { __grokbotDedupe?: Map<string, number> };
+      if (!g.__grokbotDedupe) g.__grokbotDedupe = new Map();
+      const now = Date.now();
+      const until = g.__grokbotDedupe.get(key);
+      if (until && until > now) return false;
+      g.__grokbotDedupe.set(key, now + ttlMs);
+      return true;
+    },
   };
 }
 
@@ -112,6 +123,7 @@ const K = {
   index: "gb:jobs",
   settings: "gb:settings",
   agent: "gb:agent",
+  dedupe: (key: string) => `gb:dedupe:${key}`,
 };
 
 // Atomic status transition: only apply when the current status is in the allowed set.
@@ -187,6 +199,11 @@ function redisStore(redis: Redis): Store {
     },
     async setAgent(status) {
       await redis.set(K.agent, status, { ex: 3600 });
+    },
+    async tryClaimDedupe(key, ttlMs) {
+      // SET NX PX — only the first concurrent claim wins. Upstash returns "OK" | null.
+      const res = await redis.set(K.dedupe(key), "1", { nx: true, px: Math.max(1000, ttlMs) });
+      return res === "OK";
     },
   };
 }
