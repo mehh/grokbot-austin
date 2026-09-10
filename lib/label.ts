@@ -89,7 +89,7 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const flair = flairFor(badge.botName, badge.name);
   const legendary = flair.rarity === "legendary";
   const handshake = badge.handshake ? fitHandshake(badge.handshake, W - pad * 2 - 14) : null;
-  const footerH = handshake ? 30 : 26;
+  const footerH = handshake ? 34 : 28;
   const footerY = H - pad - footerH;
   const contentH = footerY - pad;
 
@@ -178,14 +178,14 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   // Footer strip
   const tag = flair.rarityTagPrint;
   parts.push(`<rect x="${pad + (legendary ? 2 : 0)}" y="${footerY}" width="${W - pad * 2 - (legendary ? 4 : 0)}" height="${footerH}" rx="3" fill="${ink}"/>`);
-  const mainY = handshake ? footerY + 14 : footerY + footerH / 2 + 4;
+  const mainY = handshake ? footerY + 15 : footerY + footerH / 2 + 4.5;
   // paint-order stroke+fill: white halo keeps glyphs thick after 1-bit threshold (thermal AA blur fix)
-  const footerStroke = `stroke="${paper}" stroke-width="1.25" paint-order="stroke fill" stroke-linejoin="round"`;
+  const footerStroke = `stroke="${paper}" stroke-width="2.1" paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round"`;
   parts.push(
-    `<text x="${pad + 8}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="12" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(EVENT.tag)}</text>`,
+    `<text x="${pad + 8}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="13" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(EVENT.tag)}</text>`,
   );
   parts.push(
-    `<text x="${W - pad - 8}" y="${mainY - 1}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="${legendary ? 700 : 500}" font-size="10" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(tag)}</text>`,
+    `<text x="${W - pad - 8}" y="${mainY - 1}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="${legendary ? 700 : 500}" font-size="11" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(tag)}</text>`,
   );
   if (handshake) {
     parts.push(
@@ -199,10 +199,10 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
 
 /** Prefer the host bot's full name; fall back to initials so the guest's line survives intact. */
 function fitHandshake(text: string, maxWidth: number): Fitted {
-  const full = fitText(`→ ${HOST_BOT}: ${text}`, maxWidth, 10, 8, 1);
+  const full = fitText(`→ ${HOST_BOT}: ${text}`, maxWidth, 11, 9, 1);
   if (!full.lines[0]?.endsWith("…")) return full;
   const initials = HOST_BOT.split(/\s+/).map((w) => w[0]).join("");
-  return fitText(`→ ${initials}: ${text}`, maxWidth, 10, 8, 1);
+  return fitText(`→ ${initials}: ${text}`, maxWidth, 11, 9, 1);
 }
 
 export function shortCode(id: string): string {

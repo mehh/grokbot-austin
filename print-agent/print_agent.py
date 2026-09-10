@@ -55,7 +55,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.9"
+VERSION = "1.0.10"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -223,6 +223,56 @@ def fit_gray_to_label(gray, width: int, height: int):
     return resized
 
 
+def ink_row_bounds(raster: bytes, width_bytes: int) -> tuple[int | None, int | None]:
+    """Return (first_ink_row, last_ink_row) or (None, None) if blank."""
+    height = len(raster) // width_bytes
+    first = last = None
+    for y in range(height):
+        row = raster[y * width_bytes : (y + 1) * width_bytes]
+        if any(row):
+            if first is None:
+                first = y
+            last = y
+    return first, last
+
+
+def center_raster_in_usable(
+    raster: bytes, height: int, width_bytes: int, usable_h: int
+) -> tuple[bytes, int]:
+    """Vertically center the inked block inside the printable window.
+
+    Trailing-white strip + bottom-only SAFE_GAP crop used to shove art upward.
+    This finds the content bbox and pads equal white above/below within usable_h.
+    """
+    usable_h = max(MIN_RASTER_LINES, usable_h)
+    first, last = ink_row_bounds(raster, width_bytes)
+    if first is None or last is None:
+        return bytes(width_bytes * usable_h), usable_h
+
+    content_h = last - first + 1
+    content = raster[first * width_bytes : (last + 1) * width_bytes]
+    if content_h > usable_h:
+        overflow = content_h - usable_h
+        top_cut = overflow // 2
+        content = content[top_cut * width_bytes : (top_cut + usable_h) * width_bytes]
+        content_h = usable_h
+        pad_top = 0
+    else:
+        pad_top = (usable_h - content_h) // 2
+    pad_bottom = usable_h - content_h - pad_top
+    out = (
+        bytes(width_bytes * pad_top)
+        + content
+        + bytes(width_bytes * pad_bottom)
+    )
+    log(
+        f"center ink rows {first}..{last} ({content_h}px) → pad_top={pad_top} "
+        f"pad_bottom={pad_bottom} usable={usable_h}",
+        "info",
+    )
+    return out, usable_h
+
+
 def strip_trailing_white_rows(
     raster: bytes, width_bytes: int, min_lines: int = MIN_RASTER_LINES
 ) -> tuple[bytes, int]:
@@ -293,11 +343,11 @@ def png_to_raster(
     Invert grayscale so dark ink becomes set bits after Pillow ``"1"`` packing
     (MSB-first). ``width_bytes = width // 8`` — no 48-byte head padding.
 
-    Height rules (v1.0.6):
+    Height rules (v1.0.10):
       1. Fit PNG without letterboxing onto a taller canvas.
-      2. Strip trailing all-white rows (keep ≥32).
-      3. Gap media: min(h, label_h - SAFE_GAP_DOTS); continuous: min(h, label_h).
-      4. Optional RASTER_TRIM (default 0).
+      2. Find ink bbox and vertically center it in usable height
+         (label_h - SAFE_GAP_DOTS on gap media).
+      3. Optional RASTER_TRIM splits equally top/bottom.
     """
     from PIL import Image, ImageOps  # imported lazily so --scan works without Pillow
 
@@ -339,18 +389,28 @@ def png_to_raster(
             f"expected {width_bytes * out_height} for {width}x{out_height}"
         )
 
-    stripped_h = out_height
-    raster, out_height = strip_trailing_white_rows(raster, width_bytes)
-    if out_height != stripped_h:
-        log(f"stripped trailing white: {stripped_h} → {out_height} lines", "info")
+    # Usable window: leave SAFE_GAP at the bottom for gap-seek; center ink in the rest.
+    if media_byte == MEDIA_GAP and gap_dots > 0 and cfg_h > gap_dots:
+        usable = cfg_h - gap_dots
+    else:
+        usable = cfg_h
 
-    raster, out_height = apply_height_caps(
-        raster, out_height, width_bytes, cfg_h, media_byte, gap_dots
-    )
+    before = out_height
+    raster, out_height = center_raster_in_usable(raster, out_height, width_bytes, usable)
+
+    trim = RASTER_TRIM
+    if trim and out_height > trim + MIN_RASTER_LINES:
+        # Trim equally from top+bottom so we stay centered.
+        top = trim // 2
+        bottom = trim - top
+        raster = raster[top * width_bytes : (out_height - bottom) * width_bytes]
+        out_height = out_height - trim
+        log(f"RASTER_TRIM={trim}: centered trim → {out_height}", "info")
+
     log(
         f"final raster {out_height} lines × {width_bytes}B "
-        f"({len(raster)} bytes) · formula min(fit, strip, "
-        f"{'label_h-SAFE_GAP' if media_byte == MEDIA_GAP else 'label_h'})",
+        f"({len(raster)} bytes) · centered in usable={usable} "
+        f"(from {before}, label_h={cfg_h}, gap={gap_dots})",
         "ok",
     )
     return raster, out_height, width_bytes
