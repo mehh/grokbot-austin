@@ -3,6 +3,7 @@ import { renderLabelPng } from "@/lib/render";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 /**
  * GET /api/label/<badgeId>.png[?scale=2]

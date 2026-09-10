@@ -3,6 +3,7 @@ import { getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const TICK_MS = 2000;
 // Serverless functions can't stream forever; EventSource reconnects automatically.

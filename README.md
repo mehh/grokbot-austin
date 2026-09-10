@@ -31,17 +31,18 @@ Production: **https://grokbotaustin.vercel.app**
 
 ```bash
 git clone https://github.com/mehh/grokbot-austin && cd grokbot-austin
-npm run print-agent:setup      # pip install bleak pillow
 export BOOTH_URL=https://grokbotaustin.vercel.app
 export BOOTH_TOKEN=austin-gtm-2026     # must match Vercel (or ADMIN_TOKEN if set)
 export PHOMEMO_ADDR=Q450E5CQ7550085    # printer's BLE name / serial
-npm run print-agent            # == python3 print-agent/print_agent.py
+npm run print-agent            # first run creates print-agent/.venv and installs bleak + pillow
 ```
+
+(No Node? `cd print-agent && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/python print_agent.py`. Env vars can also live in `.env.local` at the repo root.)
 
 - Turn the M110 on (blue blinking light). **Do not pair it in macOS Bluetooth settings** and close the Phomemo phone app — BLE printers only take one client.
 - First run: macOS asks to allow Bluetooth for your terminal. Allow it.
 - The agent scans for `Q450E5CQ7550085`, connects, and then polls the queue every 2.5s. **Auto-print is on by default.** Every new claim prints itself.
-- Useful flags: `--scan` (list BLE devices), `--test` (print a test label), `--dry-run` (no Bluetooth, saves PNGs to `print-agent/out/`), `--density 12` (lighter), `--debug`.
+- Useful flags (pass after `--`, e.g. `npm run print-agent -- --scan`): `--scan` (list BLE devices), `--test` (print a test label), `--dry-run` (no Bluetooth, saves PNGs to `print-agent/out/`), `--density 12` (lighter), `--lazy` (connect on first job), `--debug`.
 
 ### 3. Open the booth dashboard
 

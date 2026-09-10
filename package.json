@@ -2,7 +2,7 @@
   "name": "grokbot-austin",
   "version": "1.0.0",
   "private": true,
-  "description": "Grok Bot Austin GTM build night — bot-to-bot badge booth with auto-print to a Phomemo M110",
+  "description": "Grok Bot Austin GTM build night \u2014 bot-to-bot badge booth with auto-print to a Phomemo M110",
   "homepage": "https://grokbotaustin.vercel.app",
   "repository": {
     "type": "git",
@@ -13,8 +13,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "print-agent": "python3 print-agent/print_agent.py",
-    "print-agent:setup": "python3 -m pip install -r print-agent/requirements.txt"
+    "print-agent": "bash print-agent/run.sh",
+    "print-agent:setup": "bash -c \"cd print-agent && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt\""
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
