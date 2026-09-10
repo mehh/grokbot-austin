@@ -31,6 +31,7 @@ Env vars (Project → Settings → Environment Variables):
 | `NEXT_PUBLIC_BASE_URL` | `https://grokbotaustin.vercel.app` | Used for QR codes, bot prompt, badge links |
 | `BOOTH_TOKEN` | `austin-gtm-2026` | Party password. Bots send it as `x-booth-token`; the print agent uses it too. Shown publicly on `/prompt` on purpose. |
 | `BADGE_SECRET` | dev fallback | HMAC key that signs badge ids. **Set a random string in prod.** |
+| `NEXT_PUBLIC_PHOMEMO_NAME` | `q450E5CQ7550085` | Printer BLE name/serial. `/booth`'s Web Bluetooth fallback prefers this device in the chooser and on silent reconnect. |
 | `ADMIN_TOKEN` | _(unset → uses `BOOTH_TOKEN`)_ | Optional. If set, only this token can mutate the queue (pause/reprint/agent). Keeps guests who read `/prompt` from driving the printer. |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | _(unset → in-memory)_ | Optional. Upstash Redis for a durable queue (Vercel Marketplace → Upstash → "Connect" adds these automatically; `UPSTASH_REDIS_REST_*` also works). |
 
@@ -44,15 +45,16 @@ CLI alternative from any laptop: `npx vercel link` (pick/create project `grokbot
 git clone https://github.com/mehh/grokbot-austin && cd grokbot-austin
 export BOOTH_URL=https://grokbotaustin.vercel.app
 export BOOTH_TOKEN=austin-gtm-2026     # must match Vercel (or ADMIN_TOKEN if set)
-export PHOMEMO_ADDR=Q450E5CQ7550085    # printer's BLE name / serial
+export PHOMEMO_ADDR=q450E5CQ7550085    # printer's BLE name / serial (case-insensitive match)
 npm run print-agent            # first run creates print-agent/.venv and installs bleak + pillow
 ```
 
 (No Node? `cd print-agent && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/python print_agent.py`. Env vars can also live in `.env.local` at the repo root.)
 
-- Turn the M110 on (blue blinking light). **Do not pair it in macOS Bluetooth settings** and close the Phomemo phone app — BLE printers only take one client.
+- Kris's M110 is already powered on and visible over BLE as **`q450E5CQ7550085`**. Close the Phomemo phone app — BLE printers only take one client.
+- **Pairing gotcha.** The M110 should *not* be paired in macOS System Settings → Bluetooth. If it currently shows there as connected and prints fail or the agent can't connect, click ⓘ → **Forget This Device**, power-cycle the printer, and let the agent / Chrome / pyphomemo own the BLE session. (If it's already printing fine while listed there, leave it alone.)
 - First run: macOS asks to allow Bluetooth for your terminal. Allow it.
-- The agent scans for `Q450E5CQ7550085`, connects, and then polls the queue every 2.5s. **Auto-print is on by default.** Every new claim prints itself.
+- The agent scans for `q450E5CQ7550085` (name/serial match is case-insensitive), connects, and then polls the queue every 2.5s. **Auto-print is on by default.** Every new claim prints itself.
 - Useful flags (pass after `--`, e.g. `npm run print-agent -- --scan`): `--scan` (list BLE devices), `--test` (print a test label), `--dry-run` (no Bluetooth, saves PNGs to `print-agent/out/`), `--density 12` (lighter), `--lazy` (connect on first job), `--debug`.
 
 ### 3. Open the booth dashboard
@@ -63,6 +65,7 @@ npm run print-agent            # first run creates print-agent/.venv and install
 - **Auto-print toggle** pauses the agent remotely (it keeps polling, stops claiming).
 - Per job: **✓ mark printed**, **✕ skip**, **reprint**. **Test print** queues a calibration badge.
 - The booth token is prefilled unless you set `ADMIN_TOKEN` — then type it once (stored in localStorage) or open `/booth?token=…`.
+- **Browser fallback (Chrome/Edge only):** the "printer · this browser" card connects over Web Bluetooth. It first tries a silent reconnect to an already-authorized device whose name contains `q450E5CQ7550085`; otherwise the chooser opens with that serial preferred but any Phomemo (M110/M120/M220, `Q…` serials, service `ff00`) selectable. Once connected, every job gets a **▮ print here** button (claims → prints → marks printed/failed). Use it if the Python agent is down.
 
 ### 4. Tell guests
 
@@ -77,10 +80,13 @@ npm run print-agent            # first run creates print-agent/.venv and install
 
 ```bash
 pip install git+https://github.com/mkuhlmann/pyphomemo
-export PHOMEMO_ADDR=Q450E5CQ7550085
-curl -o badge.png "https://grokbotaustin.vercel.app/api/label/<badgeId>.png"
-phomemo print-image badge.png --label 40x30
+curl -o badge.png "https://grokbotaustin.vercel.app/api/label/<badgeId>.png"   # or ↓ Label PNG on any badge page
+phomemo print-image badge.png --label 40x30 --addr q450E5CQ7550085
 ```
+
+`phomemo scan` lists nearby printers if the serial doesn't resolve. `export PHOMEMO_ADDR=q450E5CQ7550085` saves typing `--addr`.
+
+**If Web Bluetooth / pyphomemo prints fail after pairing in macOS System Settings:** unpair (Bluetooth → ⓘ → Forget This Device), power-cycle the M110, and let Chrome or pyphomemo own the BLE session — macOS-level pairing grabs the classic profile and blocks the LE writes. Kris's unit is currently connected under the id `q450E5CQ7550085`; only unpair if prints actually fail.
 
 **Phone app** — download the label PNG from any badge page (`↓ Label PNG`) and print it from the Phomemo app at 40×30mm.
 
@@ -105,6 +111,7 @@ app/
   api/queue/[id]/…       POST — claim | complete | fail | reprint | cancel (token)
   api/queue/stream       GET  — SSE snapshots (optional; dashboard polls)
 lib/
+  webble.ts              Web Bluetooth M110 driver for the /booth fallback (Chrome/Edge)
   avatar.ts              procedural SVG avatars (18 shapes · 10 eyes · accessories)
   label.ts               320×240 label layout, text fitting
   render.ts              resvg → threshold → real 1-bit PNG

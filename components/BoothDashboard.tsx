@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar, stateForStatus } from "./Avatar";
+import { BrowserPrinterCard, useBrowserPrinter } from "./BrowserPrinter";
 
 type JobStatus = "queued" | "printing" | "printed" | "failed";
 
@@ -45,8 +46,9 @@ interface Snapshot {
 const POLL_MS = 2000;
 const TOKEN_KEY = "gb_booth_token";
 
-export function BoothDashboard({ prefillToken, claimUrl }: { prefillToken: string; claimUrl: string }) {
+export function BoothDashboard({ prefillToken, claimUrl, printerName }: { prefillToken: string; claimUrl: string; printerName: string }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
+  const printer = useBrowserPrinter(printerName);
   const [token, setToken] = useState(prefillToken);
   const [error, setError] = useState<string | null>(null);
   const [sound, setSound] = useState(false);
@@ -147,6 +149,36 @@ export function BoothDashboard({ prefillToken, claimUrl }: { prefillToken: strin
     setBusyId(job.id);
     try {
       await mutate(`/api/queue/${encodeURIComponent(job.id)}/${action}`, { agent: "booth-dashboard" });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  /** Fallback: print a job from this browser over Web Bluetooth (claim → print → complete/fail). */
+  async function printHere(job: Job) {
+    if (!token) {
+      setError("Enter the booth token to control the queue.");
+      return;
+    }
+    setBusyId(job.id);
+    try {
+      if (job.status === "queued") {
+        const claimed = await mutate(`/api/queue/${encodeURIComponent(job.id)}/claim`, { agent: "booth-browser" });
+        if (!claimed) return;
+      } else if (job.status !== "printing") {
+        const re = await mutate(`/api/queue/${encodeURIComponent(job.id)}/reprint`, { agent: "booth-browser" });
+        if (!re) return;
+        const claimed = await mutate(`/api/queue/${encodeURIComponent(job.id)}/claim`, { agent: "booth-browser" });
+        if (!claimed) return;
+      }
+      try {
+        await printer.printLabel(job.badgeId);
+        await mutate(`/api/queue/${encodeURIComponent(job.id)}/complete`, { agent: "booth-browser" });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        await mutate(`/api/queue/${encodeURIComponent(job.id)}/fail`, { agent: "booth-browser", error: `browser: ${msg}` });
+        setError(`Browser print failed: ${msg}`);
+      }
     } finally {
       setBusyId(null);
     }
@@ -270,7 +302,7 @@ export function BoothDashboard({ prefillToken, claimUrl }: { prefillToken: strin
           ) : (
             <ul className="grid gap-2">
               {active.map((job, i) => (
-                <JobRow key={job.id} job={job} index={i} busy={busyId === job.id} onAct={act} />
+                <JobRow key={job.id} job={job} index={i} busy={busyId === job.id} onAct={act} onPrintHere={printer.state === "connected" ? printHere : undefined} />
               ))}
             </ul>
           )}
@@ -281,7 +313,7 @@ export function BoothDashboard({ prefillToken, claimUrl }: { prefillToken: strin
           ) : (
             <ul className="grid gap-2">
               {history.slice(0, 40).map((job) => (
-                <JobRow key={job.id} job={job} busy={busyId === job.id} onAct={act} compact />
+                <JobRow key={job.id} job={job} busy={busyId === job.id} onAct={act} compact onPrintHere={printer.state === "connected" ? printHere : undefined} />
               ))}
             </ul>
           )}
@@ -319,6 +351,8 @@ export function BoothDashboard({ prefillToken, claimUrl }: { prefillToken: strin
               </div>
             </div>
           </div>
+
+          <BrowserPrinterCard printer={printer} agentOnline={agentOnline} />
 
           {snap?.agent ? (
             <div className="card p-4 text-xs">
@@ -376,12 +410,14 @@ function JobRow({
   busy,
   compact,
   onAct,
+  onPrintHere,
 }: {
   job: Job;
   index?: number;
   busy: boolean;
   compact?: boolean;
   onAct: (job: Job, action: "reprint" | "cancel" | "complete" | "fail") => void;
+  onPrintHere?: (job: Job) => void;
 }) {
   const chip: Record<JobStatus, string> = {
     queued: "text-warn border-warn/40",
@@ -409,6 +445,11 @@ function JobRow({
       </div>
       <span className={`rounded-full border px-2 py-0.5 text-[10px] tracking-[0.12em] uppercase ${chip[job.status]}`}>{job.status}</span>
       <div className="flex shrink-0 basis-full items-center justify-end gap-1 sm:basis-auto">
+        {onPrintHere ? (
+          <button type="button" disabled={busy} onClick={() => onPrintHere(job)} className="btn-primary btn-sm" title="Print from this browser over Web Bluetooth">
+            {busy ? "…" : "▮ print here"}
+          </button>
+        ) : null}
         {job.status === "queued" || job.status === "printing" ? (
           <>
             <button type="button" disabled={busy} onClick={() => onAct(job, "complete")} className="btn-ghost btn-sm" title="Mark printed (if you printed it another way)">

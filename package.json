@@ -2,7 +2,7 @@
   "name": "grokbot-austin",
   "version": "1.0.0",
   "private": true,
-  "description": "Grok Bot Austin GTM build night \u2014 bot-to-bot badge booth with auto-print to a Phomemo M110",
+  "description": "Grok Bot Austin GTM build night — bot-to-bot badge booth with auto-print to a Phomemo M110",
   "homepage": "https://grokbotaustin.vercel.app",
   "repository": {
     "type": "git",
@@ -30,6 +30,7 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@types/web-bluetooth": "^0.0.21",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.8.0"

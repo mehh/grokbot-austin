@@ -8,7 +8,7 @@ is on by default; pause it from the /booth dashboard.
 
     export BOOTH_URL=https://grokbotaustin.vercel.app
     export BOOTH_TOKEN=austin-gtm-2026
-    export PHOMEMO_ADDR=Q450E5CQ7550085      # BLE name (serial) or MAC/UUID
+    export PHOMEMO_ADDR=q450E5CQ7550085      # BLE name (serial) or MAC/UUID
     python3 print_agent.py
 
 Options:
@@ -49,7 +49,7 @@ VERSION = "1.0.0"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
-DEFAULT_ADDR = "Q450E5CQ7550085"
+DEFAULT_ADDR = "q450E5CQ7550085"
 
 SERVICE_UUID = "0000ff00-0000-1000-8000-00805f9b34fb"
 WRITE_CHAR_UUID = "0000ff02-0000-1000-8000-00805f9b34fb"

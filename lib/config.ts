@@ -26,6 +26,11 @@ export function baseUrl(): string {
   return raw.replace(/\/+$/, "");
 }
 
+/** BLE name / serial of the booth's Phomemo M110 (used by Web Bluetooth filters on /booth). */
+export function phomemoName(): string {
+  return process.env.NEXT_PUBLIC_PHOMEMO_NAME?.trim() || "q450E5CQ7550085";
+}
+
 export function boothToken(): string {
   return process.env.BOOTH_TOKEN?.trim() || "austin-gtm-2026";
 }
