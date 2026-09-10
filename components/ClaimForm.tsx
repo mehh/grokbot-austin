@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Badge } from "@/lib/badge";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
 import { HOST_BOT, LIMITS } from "@/lib/config";
-import { flairFor } from "@/lib/flair";
+import { flairFor, resolveIcebreaker } from "@/lib/flair";
 import { Avatar } from "./Avatar";
 import { LabelPreview } from "./LabelPreview";
 
@@ -20,6 +20,7 @@ export function ClaimForm() {
   const [vibe, setVibe] = useState("");
   const [quote, setQuote] = useState("");
   const [handshake, setHandshake] = useState("");
+  const [icebreaker, setIcebreaker] = useState("");
   const [website, setWebsite] = useState("");
   const [sound, setSound] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -60,10 +61,11 @@ export function ClaimForm() {
       vibe: vibe.trim() || undefined,
       quote: quote.trim() || undefined,
       handshake: handshake.trim() || undefined,
+      icebreaker: icebreaker.trim() || undefined,
       source: "human",
       createdAt: 0,
     }),
-    [name, botName, title, vibe, quote, handshake],
+    [name, botName, title, vibe, quote, handshake, icebreaker],
   );
 
   const spec = avatarSpec(preview.botName, preview.name);
@@ -84,7 +86,7 @@ export function ClaimForm() {
       const res = await fetch("/api/claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personName: name, botName, botTitle: title, vibe, quote, handshake, website, source: "human" }),
+        body: JSON.stringify({ personName: name, botName, botTitle: title, vibe, quote, handshake, icebreaker, website, source: "human" }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || `Claim failed (${res.status})`);
@@ -116,6 +118,10 @@ export function ClaimForm() {
             </span>
           ) : null}
         </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-neutral-300">
+          <span className="text-dim">&gt; </span>
+          {resolveIcebreaker(preview)}
+        </p>
         <p className="mt-2 text-[11px] leading-relaxed text-dim">
           Your bot is derived from both names. Same names → same bot, every time. Want a different look? Try a nickname.
         </p>
@@ -181,6 +187,16 @@ export function ClaimForm() {
             value={handshake}
             onChange={(e) => setHandshake(e.target.value.slice(0, LIMITS.handshake))}
             placeholder="Your calendar is safe with me."
+            autoComplete="off"
+          />
+        </Field>
+
+        <Field label="Icebreaker" hint="optional · ask me about…" count={icebreaker.length} max={LIMITS.icebreaker}>
+          <input
+            className="field"
+            value={icebreaker}
+            onChange={(e) => setIcebreaker(e.target.value.slice(0, LIMITS.icebreaker))}
+            placeholder="ask me about shipping PeptIQ to clinics"
             autoComplete="off"
           />
         </Field>

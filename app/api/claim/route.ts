@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * The claim endpoint — for guests' Grok Bots (with `x-booth-token`) and the manual form (without).
- * Body: { personName, botName, botTitle?, vibe?, quote?, handshake? }  (name/title aliases accepted)
+ * Body: { personName, botName, botTitle?, vibe?, quote?, handshake?, icebreaker? }
+ *   (name/title aliases accepted; icebreaker also accepts iceBreaker / askMeAbout)
  * Requests carrying the booth token are treated as bot-to-bot claims and skip the per-IP rate limit.
  */
 export async function POST(req: Request) {
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
           vibe: badge.vibe,
           quote: badge.quote,
           handshake: badge.handshake,
+          icebreaker: badge.icebreaker,
         },
       },
       { status: 201 },

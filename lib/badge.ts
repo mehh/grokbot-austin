@@ -12,6 +12,8 @@ export interface Badge {
   quote?: string;
   /** One-line handshake from the guest's bot to the host bot; printed in the label footer. */
   handshake?: string;
+  /** Guest-supplied icebreaker ("ask me about …"); falls back to flair when absent. */
+  icebreaker?: string;
   source: BadgeSource;
   createdAt: number;
 }
@@ -25,6 +27,9 @@ export interface BadgeInput {
   vibe?: unknown;
   quote?: unknown;
   handshake?: unknown;
+  icebreaker?: unknown;
+  iceBreaker?: unknown;
+  askMeAbout?: unknown;
   source?: unknown;
 }
 
@@ -36,6 +41,7 @@ interface Payload {
   v?: string;
   q?: string;
   h?: string;
+  i?: string;
   s: 0 | 1;
   c: number;
 }
@@ -67,8 +73,10 @@ export function normalizeInput(input: BadgeInput): Omit<Badge, "id" | "createdAt
   const vibe = clean(input.vibe, LIMITS.vibe) || undefined;
   const quote = clean(input.quote, LIMITS.quote) || undefined;
   const handshake = clean(input.handshake, LIMITS.handshake) || undefined;
+  const icebreaker =
+    clean(input.icebreaker ?? input.iceBreaker ?? input.askMeAbout, LIMITS.icebreaker) || undefined;
   const source: BadgeSource = input.source === "bot" ? "bot" : "human";
-  return { name, botName, title, vibe, quote, handshake, source };
+  return { name, botName, title, vibe, quote, handshake, icebreaker, source };
 }
 
 function b64url(buf: Buffer): string {
@@ -101,6 +109,7 @@ export function createBadge(input: BadgeInput, createdAt = Date.now()): Badge {
   if (data.vibe) payload.v = data.vibe;
   if (data.quote) payload.q = data.quote;
   if (data.handshake) payload.h = data.handshake;
+  if (data.icebreaker) payload.i = data.icebreaker;
   const body = b64url(Buffer.from(JSON.stringify(payload), "utf8"));
   const id = `${body}.${sign(body)}`;
   return { id, ...data, createdAt };
@@ -126,6 +135,7 @@ export function decodeBadge(id: string): Badge | null {
       vibe: payload.v || undefined,
       quote: payload.q || undefined,
       handshake: payload.h || undefined,
+      icebreaker: payload.i || undefined,
       source: payload.s === 1 ? "bot" : "human",
       createdAt: typeof payload.c === "number" ? payload.c : 0,
     };

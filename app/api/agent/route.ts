@@ -12,7 +12,7 @@ export async function GET() {
   return json({
     ok: true,
     service: "Grok Bot Austin badge booth",
-    how: "POST JSON to /api/claim (or this URL) with header x-booth-token. Fields: personName (required), botName (required), botTitle, vibe, quote, handshake.",
+    how: "POST JSON to /api/claim (or this URL) with header x-booth-token. Fields: personName (required), botName (required), botTitle, vibe, quote, handshake, icebreaker.",
     prompt: botPrompt({ token: "<x-booth-token from the /prompt page>" }),
     docs: `${baseUrl()}/prompt`,
   });

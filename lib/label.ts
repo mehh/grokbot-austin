@@ -6,7 +6,7 @@
 import type { Badge } from "./badge";
 import { PRINT_COLORS, avatarInner, avatarSpec } from "./avatar";
 import { EVENT, HOST_BOT, LABEL } from "./config";
-import { flairFor } from "./flair";
+import { flairFor, resolveIcebreaker } from "./flair";
 
 export const LABEL_FONT_FAMILY = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
 /** Geist Mono advance width as a fraction of font-size. */
@@ -111,7 +111,7 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const bot = fitText(badge.botName, textW, 16, 12, 1);
   const subtitle = badge.title || badge.vibe || "";
   const sub = subtitle ? fitText(subtitle, textW, 12, 11, 1) : { lines: [] as string[], size: 12 };
-  const ice = fitText(`> ${flair.icebreaker}`, textW, 12, 11, 2);
+  const ice = fitText(`> ${resolveIcebreaker(badge)}`, textW, 12, 11, 2);
 
   const lineH = (size: number) => Math.round(size * 1.12);
   const nameBlock = name.lines.length * lineH(name.size);

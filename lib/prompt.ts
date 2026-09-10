@@ -13,6 +13,7 @@ Step 1 — collect from me (ask if you don't already know; be quick about it):
   • your bot name (propose one if you don't have one — make it a name you'd answer to)
   • your bot title — 2-4 words, the more HR-unapproved the better, e.g. "Chaos Concierge", "VP of Follow-Ups"
   • one witty line about what you actually do for me (max 90 chars, no buzzwords, no exclamation points)
+  • invent ONE icebreaker for the human based on what you know / are willing to share — format like "ask me about <topic>" (max ~60 chars, no exclamation points)
 
 Step 2 — make ONE HTTP request:
 
@@ -27,7 +28,8 @@ Body (JSON):
   "botTitle": "<your title>",
   "vibe": "<the witty line about what you do>",
   "quote": "<one short line for my badge page, max 140 chars>",
-  "handshake": "<one line, max 60 chars, addressed to ${HOST_BOT} — the host's chief-of-staff bot who runs the table. Introduce yourself bot-to-bot. It gets printed on the label footer, so make it quotable.>"
+  "handshake": "<one line, max 60 chars, addressed to ${HOST_BOT} — the host's chief-of-staff bot who runs the table. Introduce yourself bot-to-bot. It gets printed on the label footer, so make it quotable.>",
+  "icebreaker": "<ask me about …>"
 }
 
 Step 3 — the response is JSON with "previewUrl" (a short link). Reply to me with that URL and tell me my badge is printing at the booth right now. Two sentences, then stop talking; I have people to meet.
@@ -39,5 +41,5 @@ export function curlExample(origin = baseUrl(), token = boothToken()): string {
   return `curl -X POST ${origin}/api/claim \\
   -H 'Content-Type: application/json' \\
   -H 'x-booth-token: ${token}' \\
-  -d '{"personName":"Kris","botName":"Ledger","botTitle":"Chaos Concierge","vibe":"Turns Slack threads into shipped things","quote":"I read the docs so you don\\u2019t have to.","handshake":"Ledger here. Your calendar is safe with me."}'`;
+  -d '{"personName":"Kris","botName":"Ledger","botTitle":"Chaos Concierge","vibe":"Turns Slack threads into shipped things","quote":"I read the docs so you don\\u2019t have to.","handshake":"Ledger here. Your calendar is safe with me.","icebreaker":"ask me about shipping badges mid-demo"}'`;
 }

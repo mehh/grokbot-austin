@@ -67,6 +67,13 @@ export function flairFor(botName: string, personName: string): Flair {
   };
 }
 
+/** Prefer a guest-supplied icebreaker; otherwise the deterministic flair line. */
+export function resolveIcebreaker(badge: { icebreaker?: string; botName: string; name: string }): string {
+  const custom = badge.icebreaker?.trim();
+  if (custom) return custom;
+  return icebreakerFor(avatarSeed(badge.botName, badge.name));
+}
+
 export const BINGO = [
   { id: "legendary", title: "Find a LEGENDARY", body: "Only ~1 in 20 badges. Photograph it with its human." },
   { id: "swap", title: "Swap icebreakers", body: "Read yours out loud. Do theirs. No skipping." },

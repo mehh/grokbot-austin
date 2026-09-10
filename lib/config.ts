@@ -22,6 +22,7 @@ export const LIMITS = {
   vibe: 100,
   quote: 160,
   handshake: 64,
+  icebreaker: 72,
 } as const;
 
 /** Kris's chief-of-staff bot at the table. Guests' bots send it a one-line handshake. */

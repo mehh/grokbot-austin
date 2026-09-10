@@ -7,7 +7,7 @@ import { PrintStatus } from "@/components/PrintStatus";
 import { ShareX } from "@/components/ShareX";
 import { shareText } from "@/lib/share";
 import { SparkBurst } from "@/components/SparkBurst";
-import { flairFor } from "@/lib/flair";
+import { flairFor, resolveIcebreaker } from "@/lib/flair";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
 import { badgeUrls, decodeBadge } from "@/lib/badge";
 import { resolveBadgeId } from "@/lib/short";
@@ -85,7 +85,7 @@ export default async function BadgePage({ params, searchParams }: { params: Para
             </div>
             <p className="relative mt-6 rounded-md border border-dashed border-white/25 px-3 py-2 text-sm text-neutral-100">
               <span className="text-dim">&gt; </span>
-              {flair.icebreaker}
+              {resolveIcebreaker(badge)}
               <span className="ml-2 text-[10px] tracking-[0.16em] text-dim uppercase">icebreaker · printed on your badge</span>
             </p>
             {badge.quote ? (
