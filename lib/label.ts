@@ -94,7 +94,7 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const contentH = footerY - pad;
 
   // Avatar block on the left (~64–72 on 160px height).
-  const avatarSize = Math.min(68, contentH);
+  const avatarSize = Math.min(62, contentH);
   const avatarX = pad + 2;
   const avatarY = pad + (contentH - avatarSize) / 2;
   const spec = avatarSpec(badge.botName, badge.name);
@@ -105,11 +105,12 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const textW = W - pad - textX;
 
   // Readable name is priority; remaining text is tighter for the short label.
-  const name = fitText(badge.name.toUpperCase(), textW, 24, 13, 2);
-  const bot = fitText(badge.botName, textW, 14, 10, 1);
+  const name = fitText(badge.name.toUpperCase(), textW, 22, 13, 2);
+  const bot = fitText(badge.botName, textW, 14, 11, 1);
   const subtitle = badge.title || badge.vibe || "";
-  const sub = subtitle ? fitText(subtitle, textW, 10, 9, 1) : { lines: [], size: 10 };
-  const ice = fitText(`> ${flair.icebreaker}`, textW, 10, 9, 2);
+  const sub = subtitle ? fitText(subtitle, textW, 11, 10, 1) : { lines: [], size: 11 };
+  // Icebreaker under title — thermal readability needs ≥11–12px on 40×20.
+  const ice = fitText(`> ${flair.icebreaker}`, textW, 12, 11, 2);
 
   const lineH = (size: number) => Math.round(size * 1.05);
   const nameBlock = name.lines.length * lineH(name.size);
