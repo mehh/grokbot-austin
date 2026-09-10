@@ -4,6 +4,7 @@ import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import type { Badge } from "./badge";
 import { labelSvg } from "./label";
+import { label4x6Svg, LABEL_4X6 } from "./label4x6";
 import { bitmapToPng, rgbaToBitmap, type Bitmap1 } from "./png1bit";
 
 const FONT_FILES = ["GeistMono-Bold.ttf", "GeistMono-Medium.ttf", "GeistMono-Regular.ttf"];
@@ -30,14 +31,14 @@ export interface RenderOptions {
   /** Integer upscale factor for on-screen previews (printer uses 1). */
   scale?: number;
   threshold?: number;
+  /** QR target for 4×6 cards (short preview URL preferred). */
+  qrUrl?: string;
 }
 
-export function renderLabelBitmap(badge: Badge, opts: RenderOptions = {}): Bitmap1 {
-  const scale = Math.max(1, Math.min(4, Math.floor(opts.scale ?? 1)));
-  const svg = labelSvg(badge);
+function resvgOpts(fit: { mode: "zoom"; value: number } | { mode: "width"; value: number }) {
   const files = fontFiles();
-  const resvg = new Resvg(svg, {
-    fitTo: { mode: "zoom", value: scale },
+  return {
+    fitTo: fit,
     background: "#ffffff",
     font: {
       loadSystemFonts: files.length === 0,
@@ -45,13 +46,31 @@ export function renderLabelBitmap(badge: Badge, opts: RenderOptions = {}): Bitma
       defaultFontFamily: "Geist Mono",
       monospaceFamily: "Geist Mono",
     },
-    textRendering: 1,
-    shapeRendering: 2,
-  });
+    textRendering: 1 as const,
+    shapeRendering: 2 as const,
+  };
+}
+
+export function renderLabelBitmap(badge: Badge, opts: RenderOptions = {}): Bitmap1 {
+  const scale = Math.max(1, Math.min(4, Math.floor(opts.scale ?? 1)));
+  const svg = labelSvg(badge);
+  const resvg = new Resvg(svg, resvgOpts({ mode: "zoom", value: scale }));
   const img = resvg.render();
   return rgbaToBitmap(img.pixels, img.width, img.height, opts.threshold ?? 115);
 }
 
 export function renderLabelPng(badge: Badge, opts: RenderOptions = {}): Buffer {
   return bitmapToPng(renderLabelBitmap(badge, opts));
+}
+
+/** 4×6" PM-241-BT badge (812×1218 @ 203 dpi) as 1-bit PNG. */
+export function renderLabel4x6Bitmap(badge: Badge, opts: RenderOptions = {}): Bitmap1 {
+  const svg = label4x6Svg(badge, { qrUrl: opts.qrUrl });
+  const resvg = new Resvg(svg, resvgOpts({ mode: "width", value: LABEL_4X6.width }));
+  const img = resvg.render();
+  return rgbaToBitmap(img.pixels, img.width, img.height, opts.threshold ?? 128);
+}
+
+export function renderLabel4x6Png(badge: Badge, opts: RenderOptions = {}): Buffer {
+  return bitmapToPng(renderLabel4x6Bitmap(badge, opts));
 }

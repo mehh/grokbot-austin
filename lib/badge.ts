@@ -149,5 +149,6 @@ export function badgeUrls(id: string, origin = baseUrl()) {
   return {
     previewUrl: `${origin}/b/${encoded}`,
     labelUrl: `${origin}/api/label/${encoded}.png`,
+    label4x6Url: `${origin}/api/label/${encoded}.png?size=4x6`,
   };
 }

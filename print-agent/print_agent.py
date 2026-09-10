@@ -1,41 +1,34 @@
 #!/usr/bin/env python3
 """
-Grok Bot Austin — local print agent (v1.0.6).
+Grok Bot Austin — local print agent (v1.1.0).
 
-Runs on the booth laptop. Polls the web app for queued badges, downloads each
-1-bit label PNG, and prints it on a Phomemo M110 over Bluetooth LE. Auto-print
-is on by default; pause it from the /booth dashboard.
-
-Feed safety (v1.0.6): PNG height is ground truth — never letterbox a shorter PNG
-onto a taller canvas. Gap media (MEDIA=0x0a) applies SAFE_GAP_DOTS (default 8)
-so a 40×20 / 320×160 job sends ≤136 lines and does not span the next label.
-Trailing all-white rows are stripped after packing. RASTER_TRIM defaults to 0.
-Disconnect after footer counts as success; PRINT_ATTEMPTS defaults to 1.
+Runs on the booth laptop. Polls the web app for queued badges and prints each
+badge. Default booth path is 4×6" on the Phomemo PM-241-BT via CUPS/USB
+(PRINT_MODE=4x6). The 40×20 M110 Bluetooth LE path remains available behind
+PRINT_MODE=m110. Auto-print is on by default; pause it from /booth.
 
     export BOOTH_URL=https://grokbotaustin.vercel.app
     export BOOTH_TOKEN=austin-gtm-2026
-    export PHOMEMO_ADDR=q450E5CQ7550085      # BLE name (serial) or MAC/UUID
-    export LABEL=40x20
-    export MEDIA=0x0a                       # 0x0a gap labels · 0x0b continuous
+    export PRINT_MODE=4x6                   # 4x6 (default) | m110 | dual
+    export CUPS_PRINTER=PM-241-BT           # CUPS queue for 4×6
+    export CUPS_PAGE_SIZE=w288h432          # 4×6 in points (also Custom.4x6in)
+    export PRINT_4X6=1                      # legacy alias; forces 4x6 when set
+    export PHOMEMO_ADDR=q450E5CQ7550085     # BLE name/serial (m110 / dual only)
+    export LABEL=40x20                      # M110 label size mm
+    export MEDIA=0x0a                       # 0x0a gap · 0x0b continuous
     export SAFE_GAP_DOTS=8
     python3 print_agent.py
 
 Options:
-    --dry-run       don't touch Bluetooth; save labels to ./out and mark printed
-    --once          drain current queue (all jobs) then exit; keeps BLE up
+    --dry-run       don't print; save labels to ./out and mark printed
+    --once          drain current queue then exit
     --scan          list nearby BLE devices and exit
-    --test          print a test label and exit (holds the same single-instance lock)
-    --label 40x20   label size in mm (default 40x20 → 320×160 dots)
-    --density 15    1 (light) .. 15 (dark)
+    --test          print a test label and exit (M110 path)
+    --label 40x20   M110 label size in mm
+    --density 15    M110 density 1..15
 
-Protocol notes (M110, reverse-engineered by phomemo-tools / phomymo / pyphomemo):
-    speed   : 1b 4e 0d <speed>
-    density : 1b 4e 04 <density>
-    media   : 1f 11 <MEDIA>            (0x0a = gap labels, 0x0b = continuous)
-    raster  : 1d 76 30 00 <wBytes LE16=width//8> <lines LE16> <bitmap, 1 = black>
-    footer  : 1f f0 05 00 1f f0 03 00
-GATT: service 0xff00, write 0xff02, notify 0xff03, 128-byte chunks.
-Packing matches pyphomemo imaging.image_to_raster (invert + convert "1" + tobytes).
+M110 protocol notes (phomemo-tools / phomymo / pyphomemo):
+    speed/density/media/raster/footer over GATT 0xff00 / write 0xff02.
 """
 from __future__ import annotations
 
@@ -55,7 +48,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.11"
+VERSION = "1.1.0"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -104,6 +97,26 @@ PRINT_ATTEMPTS = max(1, int(os.environ.get("PRINT_ATTEMPTS", "1")))
 # Default: with-response. Set WRITE_WITH_RESPONSE=0 to allow no-response.
 WRITE_WITH_RESPONSE = os.environ.get("WRITE_WITH_RESPONSE", "1").strip() not in ("0", "false", "no")
 MIN_RASTER_LINES = 32
+
+# Booth print path: 4x6 CUPS (default) | m110 BLE | dual (M110 then 4x6).
+def _resolve_print_mode() -> str:
+    raw = (os.environ.get("PRINT_MODE") or "").strip().lower()
+    if raw in ("4x6", "4×6", "cups", "pm241", "pm-241"):
+        return "4x6"
+    if raw in ("m110", "ble", "sticker", "40x20"):
+        return "m110"
+    if raw in ("dual", "both"):
+        return "dual"
+    p4 = os.environ.get("PRINT_4X6", "").strip().lower()
+    if p4 in ("0", "false", "no"):
+        return "m110"
+    if p4 in ("1", "true", "yes") or os.environ.get("CUPS_PRINTER"):
+        return "4x6"
+    return "4x6"
+
+PRINT_MODE = _resolve_print_mode()
+CUPS_PRINTER = os.environ.get("CUPS_PRINTER", "PM-241-BT").strip() or "PM-241-BT"
+CUPS_PAGE_SIZE = os.environ.get("CUPS_PAGE_SIZE", "w288h432").strip() or "w288h432"
 
 
 # --------------------------------------------------------------------------- log
@@ -161,9 +174,15 @@ class Booth:
     def heartbeat(self, payload: dict):
         return self._req("POST", "/api/agent/heartbeat", payload, timeout=8.0)
 
-    def label_png(self, badge_id: str) -> bytes:
-        path = f"/api/label/{urllib.parse.quote(badge_id, safe='')}.png"
-        status, data = self._req("GET", path, timeout=30.0)
+    def label_png(self, badge_id: str, *, size: str | None = None, short: str | None = None) -> bytes:
+        # Prefer short code in the path when available (QR + cache-friendly).
+        key = short or badge_id
+        path = f"/api/label/{urllib.parse.quote(key, safe='')}.png"
+        if size:
+            path += f"?size={urllib.parse.quote(size)}"
+            if short:
+                path += f"&qr={urllib.parse.quote(self.base.rstrip('/') + '/b/' + short)}"
+        status, data = self._req("GET", path, timeout=45.0)
         if status != 200 or not isinstance(data, (bytes, bytearray)):
             raise RuntimeError(f"label download failed ({status})")
         return bytes(data)
@@ -688,13 +707,52 @@ async def scan_cmd(timeout: float = 8.0):
         print("  nothing found — is Bluetooth on and permitted for your terminal?")
 
 
+
+# --------------------------------------------------------------------------- cups 4x6
+def cups_print_png(png: bytes, *, printer: str, page_size: str, title: str = "grokbot-4x6") -> str:
+    """Send a 1-bit 4×6 PNG to CUPS via `lp`. Returns job id string."""
+    import subprocess
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(prefix="gba-4x6-", suffix=".png", delete=False) as tmp:
+        tmp.write(png)
+        tmp_path = tmp.name
+    try:
+        cmd = [
+            "lp",
+            "-d", printer,
+            "-o", f"PageSize={page_size}",
+            "-o", "fit-to-page",
+            "-n", "1",
+            "-t", title[:80],
+            tmp_path,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        out = (proc.stdout or "") + (proc.stderr or "")
+        if proc.returncode != 0:
+            raise RuntimeError(f"lp failed ({proc.returncode}): {out.strip() or 'no output'}")
+        m = re.search(r"request id is\s+(\S+)", out)
+        job_id = m.group(1) if m else out.strip() or "ok"
+        log(f"CUPS {printer} PageSize={page_size} → {job_id}", "ok")
+        return job_id
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
 # --------------------------------------------------------------------------- agent
 class Agent:
     def __init__(self, args):
         self.args = args
         self.booth = Booth(args.url, args.token)
         self.width, self.height = parse_label(args.label)
-        self.printer = None if args.dry_run else Printer(args.addr, density=args.density, speed=args.speed, debug=args.debug)
+        self.print_mode = PRINT_MODE
+        need_ble = self.print_mode in ("m110", "dual") and not args.dry_run
+        self.printer = Printer(args.addr, density=args.density, speed=args.speed, debug=args.debug) if need_ble else None
+        self.cups_printer = CUPS_PRINTER
+        self.cups_page_size = CUPS_PAGE_SIZE
         self.agent_name = f"{socket.gethostname()}".split(".")[0][:40]
         self.printed = 0
         self.last_heartbeat = 0.0
@@ -735,6 +793,8 @@ class Agent:
     def ble_state(self) -> str:
         if self.args.dry_run:
             return "dry-run"
+        if self.print_mode == "4x6":
+            return f"cups:{self.cups_printer}"
         return self.printer.state if self.printer else "disconnected"
 
     def heartbeat(self, message: str | None = None, force: bool = False):
@@ -747,7 +807,11 @@ class Agent:
         payload = {
             "ble": self.ble_state(),
             "host": self.agent_name,
-            "printer": (self.printer.info.name if self.printer and self.printer.info else self.args.addr),
+            "printer": (
+                self.cups_printer if self.print_mode == "4x6"
+                else (self.printer.info.name if self.printer and self.printer.info else self.args.addr)
+            ),
+            "printMode": self.print_mode,
             "message": self.last_message[:200],
             "version": VERSION,
             "printed": self.printed,
@@ -786,20 +850,43 @@ class Agent:
         self.heartbeat(f"printing {who}", force=True)
 
         try:
-            png = self.booth.label_png(job["badgeId"])
-            raster, height, width_bytes = png_to_raster(png, self.width, self.height, self.args.threshold)
-            if self.out_dir:
-                path = self.out_dir / f"{int(time.time())}-{re.sub(r'[^a-zA-Z0-9]+', '_', who)[:40]}.png"
-                path.write_bytes(png)
-                log(f"saved {path}", "info")
-            if self.args.dry_run:
-                await asyncio.sleep(0.6)
-            else:
-                await self.print_with_retry(raster, height, width_bytes)
+            short = job.get("short") or None
+            badge_id = job["badgeId"]
+            mode = self.print_mode
+            log(f"mode={mode} · cups={self.cups_printer}", "info")
+
+            if mode in ("4x6", "dual"):
+                png4 = self.booth.label_png(badge_id, size="4x6", short=short)
+                if self.out_dir:
+                    path4 = self.out_dir / f"{int(time.time())}-{re.sub(r'[^a-zA-Z0-9]+', '_', who)[:40]}-4x6.png"
+                    path4.write_bytes(png4)
+                    log(f"saved {path4}", "info")
+                if self.args.dry_run:
+                    await asyncio.sleep(0.4)
+                else:
+                    cups_print_png(
+                        png4,
+                        printer=self.cups_printer,
+                        page_size=self.cups_page_size,
+                        title=f"gba-{who}",
+                    )
+
+            if mode in ("m110", "dual"):
+                png = self.booth.label_png(badge_id, short=short)
+                raster, height, width_bytes = png_to_raster(png, self.width, self.height, self.args.threshold)
+                if self.out_dir:
+                    path_m = self.out_dir / f"{int(time.time())}-{re.sub(r'[^a-zA-Z0-9]+', '_', who)[:40]}.png"
+                    path_m.write_bytes(png)
+                    log(f"saved {path_m}", "info")
+                if self.args.dry_run:
+                    await asyncio.sleep(0.4)
+                else:
+                    await self.print_with_retry(raster, height, width_bytes)
+
             self.printed += 1
             self._remember(job)
             self.booth.complete(jid, self.agent_name)
-            log(f"printed {who}", "ok")
+            log(f"printed {who} ({mode})", "ok")
             self.heartbeat(f"printed {who}", force=True)
             return True
         except Exception as exc:  # noqa: BLE001
@@ -831,16 +918,20 @@ class Agent:
     async def run(self):
         log(f"grokbot print agent v{VERSION} on {platform.system()} · {self.agent_name}")
         log(f"booth  {self.booth.base}")
-        cap = max(MIN_RASTER_LINES, self.height - SAFE_GAP_DOTS) if MEDIA == MEDIA_GAP else self.height
-        log(
-            f"label  {self.args.label} mm → {self.width}×{self.height} dots · "
-            f"media 0x{MEDIA:02x} · safe-cap {cap} · density {self.args.density}"
-        )
+        log(f"PRINT_MODE={self.print_mode} · CUPS_PRINTER={self.cups_printer} · PageSize={self.cups_page_size}")
+        if self.print_mode in ("m110", "dual"):
+            cap = max(MIN_RASTER_LINES, self.height - SAFE_GAP_DOTS) if MEDIA == MEDIA_GAP else self.height
+            log(
+                f"M110 label {self.args.label} mm → {self.width}×{self.height} dots · "
+                f"media 0x{MEDIA:02x} · safe-cap {cap} · density {self.args.density}"
+            )
         if self.args.dry_run:
             log(f"DRY RUN · labels saved to {self.out_dir}", "warn")
+        elif self.print_mode == "4x6":
+            log(f"printer CUPS/{self.cups_printer} (4×6)", "print")
         else:
             log(f"printer {self.args.addr}", "ble")
-            if not self.args.lazy:
+            if self.printer and not self.args.lazy:
                 try:
                     await self.printer.connect()
                 except Exception as exc:  # noqa: BLE001
