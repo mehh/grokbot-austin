@@ -149,3 +149,4 @@ print-agent/__pycache__/
 print-agent/.venv/
 print-agent/out/
 *.pyc
+.env*

@@ -23,7 +23,7 @@ Protocol notes (M110, reverse-engineered by phomemo-tools / phomymo / pyphomemo)
     speed   : 1b 4e 0d <speed>
     density : 1b 4e 04 <density>
     media   : 1f 11 0a                 (labels with gaps)
-    raster  : 1d 76 30 00 <wBytes LE16> <lines LE16> <bitmap, 1 = black>
+    raster  : 1d 76 30 00 <wBytes LE16=48> <lines LE16> <bitmap, 1 = black, pad to 48B/line>
     footer  : 1f f0 05 00 1f f0 03 00
 GATT: service 0xff00, write 0xff02, notify 0xff03, 128-byte chunks.
 """
@@ -45,7 +45,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -69,6 +69,10 @@ DELAY_INIT = 0.05
 DELAY_BEFORE_FOOTER = float(os.environ.get("DELAY_BEFORE", "0.50"))
 DELAY_AFTER_FOOTER = float(os.environ.get("DELAY_AFTER", "1.50"))
 PX_PER_MM = 8
+# M110 print head is always 384 dots; GS v 0 width_bytes must be 48 even for
+# narrower labels (pad each row). Sending 40B for 40mm labels causes vertical stripes.
+HEAD_WIDTH = 384
+HEAD_BYTES = 48  # HEAD_WIDTH // 8
 
 
 # --------------------------------------------------------------------------- log
@@ -148,7 +152,11 @@ def parse_label(spec: str) -> tuple[int, int]:
 
 
 def png_to_raster(png: bytes, width: int, height: int, threshold: int = 128) -> tuple[bytes, int]:
-    """Return (packed 1bpp rows with 1 = black, height). Fits the image on a white label canvas."""
+    """Return (rows packed MSB-first, 1=black, padded to HEAD_BYTES, height).
+
+    Render content at label size (e.g. 320×240 for 40x30), then center-pad each
+    row with white (0) out to 48 bytes so the M110 384-dot head parses correctly.
+    """
     from PIL import Image  # imported lazily so --scan works without Pillow
 
     img = Image.open(io.BytesIO(png))
@@ -165,10 +173,19 @@ def png_to_raster(png: bytes, width: int, height: int, threshold: int = 128) -> 
         canvas.paste(resized, ((width - new[0]) // 2, (height - new[1]) // 2))
         gray = canvas
 
-    bw = gray.point(lambda v: 0 if v < threshold else 255, mode="1")
-    # PIL "1" mode packs 1 = white; the printer wants 1 = black.
-    packed = bytes(~b & 0xFF for b in bw.tobytes())
-    return packed, height
+    content_bytes = (width + 7) // 8
+    if content_bytes > HEAD_BYTES:
+        raise ValueError(f"label width {width}px needs {content_bytes}B/line > head {HEAD_BYTES}B")
+    pad_left = (HEAD_BYTES - content_bytes) // 2
+    # Explicit MSB-first pack (1 = black); do not rely on PIL mode-1 polarity.
+    rows = bytearray(HEAD_BYTES * height)
+    pixels = gray.load()
+    for y in range(height):
+        row_off = y * HEAD_BYTES + pad_left
+        for x in range(width):
+            if pixels[x, y] < threshold:
+                rows[row_off + (x >> 3)] |= 0x80 >> (x & 7)
+    return bytes(rows), height
 
 
 def test_label_png(width: int, height: int) -> bytes:
@@ -515,7 +532,7 @@ class Agent:
         last = None
         for i in range(1, attempts + 1):
             try:
-                await self.printer.print_raster(raster, height, self.width // 8)
+                await self.printer.print_raster(raster, height, HEAD_BYTES)
                 return
             except Exception as exc:  # noqa: BLE001
                 last = exc
@@ -597,7 +614,7 @@ async def test_cmd(args):
     await printer.connect()
     log("printing test label…", "print")
     try:
-        await printer.print_raster(raster, h, width // 8)
+        await printer.print_raster(raster, h, HEAD_BYTES)
         if not printer.connected:
             raise RuntimeError("printer dropped before test completed")
         log("test label sent", "ok")

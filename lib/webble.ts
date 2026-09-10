@@ -10,6 +10,9 @@ export const M110_SERVICE = 0xff00;
 export const M110_WRITE = 0xff02;
 export const M110_NOTIFY = 0xff03;
 const CHUNK = 128;
+/** M110 print head is 384 dots; GS v 0 must use 48 bytes/line (pad narrower labels). */
+export const HEAD_WIDTH = 384;
+export const HEAD_BYTES = 48;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -157,7 +160,7 @@ export class M110Browser {
   /** Fetch a label PNG, threshold it in a canvas, and print it. */
   async printPngUrl(url: string, width = 320, height = 240) {
     const raster = await pngUrlToRaster(url, width, height);
-    await this.printRaster(raster, width / 8, height);
+    await this.printRaster(raster, HEAD_BYTES, height);
   }
 }
 
@@ -181,13 +184,19 @@ export async function pngUrlToRaster(url: string, width: number, height: number,
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(img, (width - w) / 2, (height - h) / 2, w, h);
   const { data } = ctx.getImageData(0, 0, width, height);
-  const widthBytes = width / 8;
-  const out = new Uint8Array(widthBytes * height);
+  // Pack at label width, then center-pad each row to HEAD_BYTES (48) for the M110 head.
+  const contentBytes = Math.ceil(width / 8);
+  if (contentBytes > HEAD_BYTES) {
+    throw new Error(`label width ${width}px needs ${contentBytes}B/line > head ${HEAD_BYTES}B`);
+  }
+  const padLeft = Math.floor((HEAD_BYTES - contentBytes) / 2);
+  const out = new Uint8Array(HEAD_BYTES * height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
       const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      if (lum < threshold) out[y * widthBytes + (x >> 3)] |= 0x80 >> (x & 7);
+      // MSB-first, 1 = black
+      if (lum < threshold) out[y * HEAD_BYTES + padLeft + (x >> 3)] |= 0x80 >> (x & 7);
     }
   }
   return out;
