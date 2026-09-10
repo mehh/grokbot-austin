@@ -46,7 +46,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.4"
+VERSION = "1.0.5"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -195,7 +195,7 @@ def png_to_raster(
         )
     # Tiny trim only — 40×20 stock is 160 dots tall, so height now matches the media.
     # Overshoot/gap-hunt was from printing 240-tall artwork on 20mm labels.
-    trim = max(0, min(8, int(os.environ.get("RASTER_TRIM", "2"))))
+    trim = max(0, min(24, int(os.environ.get("RASTER_TRIM", "16"))))
     if trim and out_height > trim + 32:
         out_height -= trim
         raster = raster[: width_bytes * out_height]

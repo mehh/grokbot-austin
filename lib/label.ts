@@ -85,11 +85,11 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const { ink, paper } = PRINT_COLORS;
 
   // 40×20mm (320×160): compact pad / avatar / footer so the full badge fits ONE sticker.
-  const pad = 11;
+  const pad = 12;
   const flair = flairFor(badge.botName, badge.name);
   const legendary = flair.rarity === "legendary";
   const handshake = badge.handshake ? fitHandshake(badge.handshake, W - pad * 2 - 14) : null;
-  const footerH = handshake ? 32 : 28;
+  const footerH = handshake ? 30 : 26;
   const footerY = H - pad - footerH;
   const contentH = footerY - pad;
 
