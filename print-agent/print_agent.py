@@ -55,7 +55,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.6"
+VERSION = "1.0.7"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -100,6 +100,9 @@ SAFE_GAP_DOTS = max(0, int(os.environ.get("SAFE_GAP_DOTS", "24")))
 # Optional blind trim after white-strip + safe-gap (default off — prefer those).
 RASTER_TRIM = max(0, int(os.environ.get("RASTER_TRIM", "0")))
 PRINT_ATTEMPTS = max(1, int(os.environ.get("PRINT_ATTEMPTS", "1")))
+# Mac CoreBluetooth often drops write-without-response under load → blank feed.
+# Default: with-response. Set WRITE_WITH_RESPONSE=0 to allow no-response.
+WRITE_WITH_RESPONSE = os.environ.get("WRITE_WITH_RESPONSE", "1").strip() not in ("0", "false", "no")
 MIN_RASTER_LINES = 32
 
 
@@ -542,8 +545,15 @@ class Printer:
 
     # -- printing ------------------------------------------------------------
     def _supports_no_response(self) -> bool:
-        """Prefer write-without-response when the char supports it (pyphomemo)."""
+        """Return True only when no-response writes are allowed AND supported.
+
+        Default is with-response: on macOS, flooding write-without-response drops
+        chunks and the M110 gap-feeds a blank label. Opt in with WRITE_WITH_RESPONSE=0.
+        """
         assert self.client is not None
+        if WRITE_WITH_RESPONSE:
+            self._write_with_response = True
+            return False
         if self._write_with_response is not None:
             return not self._write_with_response
         for s in self.client.services:
