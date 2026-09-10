@@ -45,7 +45,20 @@ If they don't have a bot: "No bot? Tap *manual form*, two names, done."
 
 ### 1. Deploy the web app (once, ~3 minutes)
 
-**One-click:** [Deploy `grokbot-austin` to Vercel](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmehh%2Fgrokbot-austin&project-name=grokbotaustin&repository-name=grokbot-austin&env=BADGE_SECRET,BOOTH_TOKEN,NEXT_PUBLIC_BASE_URL&envDescription=BADGE_SECRET%3A%20any%20random%20string.%20BOOTH_TOKEN%3A%20party%20password%20(default%20austin-gtm-2026).%20NEXT_PUBLIC_BASE_URL%3A%20https%3A%2F%2Fgrokbotaustin.vercel.app) — pre-fills the project name and asks for the three env vars.
+**Fastest (repo already on GitHub):** [Import `mehh/grokbot-austin`](https://vercel.com/new/import?s=https%3A%2F%2Fgithub.com%2Fmehh%2Fgrokbot-austin&project-name=grokbotaustin) — set Project Name to `grokbotaustin`, add the env vars below, Deploy.
+
+**Or clone-style one-click:** [Deploy to Vercel](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmehh%2Fgrokbot-austin&project-name=grokbotaustin&repository-name=grokbot-austin&env=BADGE_SECRET,BOOTH_TOKEN,NEXT_PUBLIC_BASE_URL&envDescription=BADGE_SECRET%3A%20any%20random%20string.%20BOOTH_TOKEN%3A%20party%20password%20(default%20austin-gtm-2026).%20NEXT_PUBLIC_BASE_URL%3A%20https%3A%2F%2Fgrokbotaustin.vercel.app) — creates a *copy* of the repo under your account; fine for tonight but pushes to `mehh/grokbot-austin` won't auto-deploy to it.
+
+**CLI (any laptop with `vercel login` done):**
+
+```bash
+git clone https://github.com/mehh/grokbot-austin && cd grokbot-austin
+npx vercel link --yes --project grokbotaustin
+npx vercel env add NEXT_PUBLIC_BASE_URL production   # https://grokbotaustin.vercel.app
+npx vercel env add BOOTH_TOKEN production            # austin-gtm-2026
+npx vercel env add BADGE_SECRET production           # any random string
+npx vercel --prod
+```
 
 **Or by hand:**
 
