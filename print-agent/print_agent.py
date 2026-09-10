@@ -45,7 +45,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -63,10 +63,11 @@ KNOWN_SERVICE_UUIDS = {
 MODEL_PREFIXES = ("M110", "M120", "M220", "M200", "M02", "T02", "PHOMEMO")
 
 CHUNK_SIZE = 128
-CHUNK_DELAY = 0.02
-DELAY_INIT = 0.03
-DELAY_BEFORE_FOOTER = 0.30
-DELAY_AFTER_FOOTER = 0.50
+# Write-without-response floods CoreBluetooth; 50ms + post-flush avoids partial labels.
+CHUNK_DELAY = float(os.environ.get("CHUNK_DELAY", "0.05"))
+DELAY_INIT = 0.05
+DELAY_BEFORE_FOOTER = float(os.environ.get("DELAY_BEFORE", "0.50"))
+DELAY_AFTER_FOOTER = float(os.environ.get("DELAY_AFTER", "1.50"))
 PX_PER_MM = 8
 
 
@@ -227,6 +228,7 @@ class Printer:
         self.client = None
         self.info: PrinterInfo | None = None
         self.write_char = WRITE_CHAR_UUID
+        self._write_with_response: bool | None = None
         self.state = "disconnected"
 
     # -- discovery -----------------------------------------------------------
@@ -285,6 +287,7 @@ class Printer:
                 client = BleakClient(target, timeout=20.0, disconnected_callback=self._on_disconnect)
                 await client.connect()
                 self.client = client
+                self._write_with_response = None
                 self._pick_write_char()
                 await self._subscribe()
                 self.state = "connected"
@@ -350,23 +353,33 @@ class Printer:
         self.state = "disconnected"
 
     # -- printing ------------------------------------------------------------
-    def _no_response(self) -> bool:
+    def _prefer_write_response(self) -> bool:
+        """Prefer GATT write-with-response when available — natural flow control."""
         assert self.client is not None
+        if self._write_with_response is not None:
+            return self._write_with_response
         for s in self.client.services:
             for c in s.characteristics:
                 if c.uuid.lower() == self.write_char.lower():
-                    return "write-without-response" in c.properties
+                    # Prefer "write" (with response) over fire-and-forget when both exist.
+                    self._write_with_response = "write" in c.properties
+                    return self._write_with_response
+        self._write_with_response = False
         return False
 
     async def _write(self, data: bytes):
         assert self.client is not None
-        await self.client.write_gatt_char(self.write_char, data, response=not self._no_response())
+        if not self.connected:
+            raise RuntimeError("printer disconnected during write")
+        await self.client.write_gatt_char(self.write_char, data, response=self._prefer_write_response())
 
     async def print_raster(self, raster: bytes, height: int, width_bytes: int):
         if not self.connected:
             await self.connect()
         if len(raster) != width_bytes * height:
             raise ValueError(f"raster {len(raster)} bytes != {width_bytes}*{height}")
+        mode = "with-response" if self._prefer_write_response() else f"no-response + {CHUNK_DELAY*1000:.0f}ms"
+        log(f"sending {len(raster)} bytes ({height} lines × {width_bytes}B) · {mode}", "print")
         await self._write(b"\x1b\x4e\x0d" + bytes([self.speed]))
         await asyncio.sleep(DELAY_INIT)
         await self._write(b"\x1b\x4e\x04" + bytes([self.density]))
@@ -374,12 +387,27 @@ class Printer:
         await self._write(b"\x1f\x11\x0a")
         await asyncio.sleep(DELAY_INIT)
         await self._write(b"\x1d\x76\x30\x00" + _u16(width_bytes) + _u16(height))
-        for i in range(0, len(raster), CHUNK_SIZE):
+        n_chunks = (len(raster) + CHUNK_SIZE - 1) // CHUNK_SIZE
+        for n, i in enumerate(range(0, len(raster), CHUNK_SIZE), start=1):
+            if not self.connected:
+                raise RuntimeError(f"printer disconnected mid-raster at chunk {n}/{n_chunks}")
             await self._write(raster[i : i + CHUNK_SIZE])
-            await asyncio.sleep(CHUNK_DELAY)
+            # With-response already paces; keep a small gap for no-response path.
+            delay = 0.005 if self._prefer_write_response() else CHUNK_DELAY
+            if delay:
+                await asyncio.sleep(delay)
+            if n == 1 or n == n_chunks or n % 25 == 0:
+                log(f"raster chunk {n}/{n_chunks}", "ble")
         await asyncio.sleep(DELAY_BEFORE_FOOTER)
+        if not self.connected:
+            raise RuntimeError("printer disconnected before footer")
         await self._write(b"\x1f\xf0\x05\x00\x1f\xf0\x03\x00")
+        # Drain OS BLE TX queue + let the head finish before we tear down GATT.
+        log(f"footer sent · draining {DELAY_AFTER_FOOTER:.1f}s…", "ble")
         await asyncio.sleep(DELAY_AFTER_FOOTER)
+        if not self.connected:
+            # Some M110 firmware drops GATT after accepting the job; treat as OK post-footer.
+            log("printer dropped during drain (common after accept) — assuming job queued", "warn")
 
 
 async def scan_cmd(timeout: float = 8.0):
@@ -568,9 +596,13 @@ async def test_cmd(args):
     printer = Printer(args.addr, density=args.density, speed=args.speed, debug=args.debug)
     await printer.connect()
     log("printing test label…", "print")
-    await printer.print_raster(raster, h, width // 8)
-    await printer.disconnect()
-    log("test label sent", "ok")
+    try:
+        await printer.print_raster(raster, h, width // 8)
+        if not printer.connected:
+            raise RuntimeError("printer dropped before test completed")
+        log("test label sent", "ok")
+    finally:
+        await printer.disconnect()
 
 
 def build_parser() -> argparse.ArgumentParser:
