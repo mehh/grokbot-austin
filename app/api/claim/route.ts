@@ -31,10 +31,15 @@ export async function POST(req: Request) {
     const hostReply = hostReplyFor(badge);
     const exchange = handshakeExchange(badge);
     const pingUrl = process.env.BOOTH_PING_URL?.trim();
-    if (pingUrl) {
+    const pingSecret = process.env.BOOTH_PING_SECRET?.trim();
+    if (pingUrl && pingSecret) {
       void fetch(pingUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${pingSecret}`,
+          "X-Automation-Key": pingSecret,
+        },
         body: JSON.stringify({
           name: badge.name,
           botName: badge.botName,
