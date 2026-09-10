@@ -23,9 +23,10 @@ Protocol notes (M110, reverse-engineered by phomemo-tools / phomymo / pyphomemo)
     speed   : 1b 4e 0d <speed>
     density : 1b 4e 04 <density>
     media   : 1f 11 0a                 (labels with gaps)
-    raster  : 1d 76 30 00 <wBytes LE16=48> <lines LE16> <bitmap, 1 = black, pad to 48B/line>
+    raster  : 1d 76 30 00 <wBytes LE16=width//8> <lines LE16> <bitmap, 1 = black>
     footer  : 1f f0 05 00 1f f0 03 00
 GATT: service 0xff00, write 0xff02, notify 0xff03, 128-byte chunks.
+Packing matches pyphomemo imaging.image_to_raster (invert + convert "1" + tobytes).
 """
 from __future__ import annotations
 
@@ -45,7 +46,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -63,16 +64,15 @@ KNOWN_SERVICE_UUIDS = {
 MODEL_PREFIXES = ("M110", "M120", "M220", "M200", "M02", "T02", "PHOMEMO")
 
 CHUNK_SIZE = 128
-# Write-without-response floods CoreBluetooth; 50ms + post-flush avoids partial labels.
-CHUNK_DELAY = float(os.environ.get("CHUNK_DELAY", "0.05"))
-DELAY_INIT = 0.05
-DELAY_BEFORE_FOOTER = float(os.environ.get("DELAY_BEFORE", "0.50"))
-DELAY_AFTER_FOOTER = float(os.environ.get("DELAY_AFTER", "1.50"))
+# Match pyphomemo protocol.CHUNK_DELAY_S (prefer write-without-response when available).
+CHUNK_DELAY = float(os.environ.get("CHUNK_DELAY", "0.02"))
+DELAY_INIT = 0.03
+DELAY_BEFORE_FOOTER = float(os.environ.get("DELAY_BEFORE", "0.30"))
+DELAY_AFTER_FOOTER = float(os.environ.get("DELAY_AFTER", "0.50"))
 PX_PER_MM = 8
-# M110 print head is always 384 dots; GS v 0 width_bytes must be 48 even for
-# narrower labels (pad each row). Sending 40B for 40mm labels causes vertical stripes.
+# Print head max is 384 dots; for a label use width_bytes = width // 8 (e.g. 40 for 40x30).
+# Do NOT pad rows to 48 — that caused vertical stripes on Kris's M110 (pyphomemo ground truth).
 HEAD_WIDTH = 384
-HEAD_BYTES = 48  # HEAD_WIDTH // 8
 
 
 # --------------------------------------------------------------------------- log
@@ -151,13 +151,19 @@ def parse_label(spec: str) -> tuple[int, int]:
     return w, h
 
 
-def png_to_raster(png: bytes, width: int, height: int, threshold: int = 128) -> tuple[bytes, int]:
-    """Return (rows packed MSB-first, 1=black, padded to HEAD_BYTES, height).
+def png_to_raster(
+    png: bytes, width: int, height: int, threshold: int | None = 128
+) -> tuple[bytes, int, int]:
+    """Return (raster, height, width_bytes) matching pyphomemo image_to_raster.
 
-    Render content at label size (e.g. 320×240 for 40x30), then center-pad each
-    row with white (0) out to 48 bytes so the M110 384-dot head parses correctly.
+    Invert grayscale so dark ink becomes set bits after Pillow ``"1"`` packing
+    (MSB-first). ``width_bytes = width // 8`` — no 48-byte head padding.
     """
-    from PIL import Image  # imported lazily so --scan works without Pillow
+    from PIL import Image, ImageOps  # imported lazily so --scan works without Pillow
+
+    if width % 8 != 0:
+        raise ValueError("width must be a multiple of 8")
+    width_bytes = width // 8
 
     img = Image.open(io.BytesIO(png))
     if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
@@ -173,19 +179,21 @@ def png_to_raster(png: bytes, width: int, height: int, threshold: int = 128) -> 
         canvas.paste(resized, ((width - new[0]) // 2, (height - new[1]) // 2))
         gray = canvas
 
-    content_bytes = (width + 7) // 8
-    if content_bytes > HEAD_BYTES:
-        raise ValueError(f"label width {width}px needs {content_bytes}B/line > head {HEAD_BYTES}B")
-    pad_left = (HEAD_BYTES - content_bytes) // 2
-    # Explicit MSB-first pack (1 = black); do not rely on PIL mode-1 polarity.
-    rows = bytearray(HEAD_BYTES * height)
-    pixels = gray.load()
-    for y in range(height):
-        row_off = y * HEAD_BYTES + pad_left
-        for x in range(width):
-            if pixels[x, y] < threshold:
-                rows[row_off + (x >> 3)] |= 0x80 >> (x & 7)
-    return bytes(rows), height
+    # Invert so dark input -> high value -> set bit after "1" conversion (pyphomemo).
+    inverted = ImageOps.invert(gray)
+    if threshold is None:
+        bw = inverted.convert("1")  # Floyd-Steinberg dithering
+    else:
+        bw = inverted.point(lambda p: 255 if p >= threshold else 0).convert("1")
+
+    raster = bw.tobytes()
+    out_height = bw.height
+    if len(raster) != width_bytes * out_height:
+        raise ValueError(
+            f"unexpected raster length {len(raster)}; "
+            f"expected {width_bytes * out_height} for {width}x{out_height}"
+        )
+    return raster, out_height, width_bytes
 
 
 def test_label_png(width: int, height: int) -> bytes:
@@ -370,32 +378,33 @@ class Printer:
         self.state = "disconnected"
 
     # -- printing ------------------------------------------------------------
-    def _prefer_write_response(self) -> bool:
-        """Prefer GATT write-with-response when available — natural flow control."""
+    def _supports_no_response(self) -> bool:
+        """Prefer write-without-response when the char supports it (pyphomemo)."""
         assert self.client is not None
         if self._write_with_response is not None:
-            return self._write_with_response
+            return not self._write_with_response
         for s in self.client.services:
             for c in s.characteristics:
                 if c.uuid.lower() == self.write_char.lower():
-                    # Prefer "write" (with response) over fire-and-forget when both exist.
-                    self._write_with_response = "write" in c.properties
-                    return self._write_with_response
-        self._write_with_response = False
+                    no_resp = "write-without-response" in c.properties
+                    self._write_with_response = not no_resp
+                    return no_resp
+        self._write_with_response = True
         return False
 
     async def _write(self, data: bytes):
         assert self.client is not None
         if not self.connected:
             raise RuntimeError("printer disconnected during write")
-        await self.client.write_gatt_char(self.write_char, data, response=self._prefer_write_response())
+        response = not self._supports_no_response()
+        await self.client.write_gatt_char(self.write_char, data, response=response)
 
     async def print_raster(self, raster: bytes, height: int, width_bytes: int):
         if not self.connected:
             await self.connect()
         if len(raster) != width_bytes * height:
             raise ValueError(f"raster {len(raster)} bytes != {width_bytes}*{height}")
-        mode = "with-response" if self._prefer_write_response() else f"no-response + {CHUNK_DELAY*1000:.0f}ms"
+        mode = f"no-response + {CHUNK_DELAY*1000:.0f}ms" if self._supports_no_response() else "with-response"
         log(f"sending {len(raster)} bytes ({height} lines × {width_bytes}B) · {mode}", "print")
         await self._write(b"\x1b\x4e\x0d" + bytes([self.speed]))
         await asyncio.sleep(DELAY_INIT)
@@ -409,8 +418,8 @@ class Printer:
             if not self.connected:
                 raise RuntimeError(f"printer disconnected mid-raster at chunk {n}/{n_chunks}")
             await self._write(raster[i : i + CHUNK_SIZE])
-            # With-response already paces; keep a small gap for no-response path.
-            delay = 0.005 if self._prefer_write_response() else CHUNK_DELAY
+            # With-response already paces; keep CHUNK_DELAY for no-response path.
+            delay = 0.005 if not self._supports_no_response() else CHUNK_DELAY
             if delay:
                 await asyncio.sleep(delay)
             if n == 1 or n == n_chunks or n % 25 == 0:
@@ -506,7 +515,7 @@ class Agent:
 
         try:
             png = self.booth.label_png(job["badgeId"])
-            raster, height = png_to_raster(png, self.width, self.height, self.args.threshold)
+            raster, height, width_bytes = png_to_raster(png, self.width, self.height, self.args.threshold)
             if self.out_dir:
                 path = self.out_dir / f"{int(time.time())}-{re.sub(r'[^a-zA-Z0-9]+', '_', who)[:40]}.png"
                 path.write_bytes(png)
@@ -514,7 +523,7 @@ class Agent:
             if self.args.dry_run:
                 await asyncio.sleep(0.6)
             else:
-                await self.print_with_retry(raster, height)
+                await self.print_with_retry(raster, height, width_bytes)
             self.printed += 1
             self.booth.complete(jid, self.agent_name)
             log(f"printed {who}", "ok")
@@ -527,12 +536,12 @@ class Agent:
             self.heartbeat(f"failed: {msg}", force=True)
             return False
 
-    async def print_with_retry(self, raster: bytes, height: int, attempts: int = 2):
+    async def print_with_retry(self, raster: bytes, height: int, width_bytes: int, attempts: int = 2):
         assert self.printer is not None
         last = None
         for i in range(1, attempts + 1):
             try:
-                await self.printer.print_raster(raster, height, HEAD_BYTES)
+                await self.printer.print_raster(raster, height, width_bytes)
                 return
             except Exception as exc:  # noqa: BLE001
                 last = exc
@@ -603,7 +612,8 @@ class Agent:
 async def test_cmd(args):
     width, height = parse_label(args.label)
     png = test_label_png(width, height)
-    raster, h = png_to_raster(png, width, height)
+    raster, h, width_bytes = png_to_raster(png, width, height)
+    log(f"raster {len(raster)} bytes · {h} lines × {width_bytes}B/line", "info")
     if args.dry_run:
         out = Path(args.save_dir or Path(__file__).parent / "out")
         out.mkdir(parents=True, exist_ok=True)
@@ -614,7 +624,7 @@ async def test_cmd(args):
     await printer.connect()
     log("printing test label…", "print")
     try:
-        await printer.print_raster(raster, h, HEAD_BYTES)
+        await printer.print_raster(raster, h, width_bytes)
         if not printer.connected:
             raise RuntimeError("printer dropped before test completed")
         log("test label sent", "ok")
