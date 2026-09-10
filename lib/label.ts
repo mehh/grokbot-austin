@@ -89,8 +89,10 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const flair = flairFor(badge.botName, badge.name);
   const legendary = flair.rarity === "legendary";
   const handshake = badge.handshake ? fitHandshake(badge.handshake, W - pad * 2 - 14) : null;
-  // Single footer row: event tag + rarity. Handshake rides inside when present.
-  const footerH = handshake ? 36 : 26;
+  // Reserve: optional handshake line + compact black bar (tag + rarity only).
+  const barH = 22;
+  const handshakeGap = handshake ? handshake.size + 6 : 0;
+  const footerH = barH + handshakeGap;
   const footerY = H - pad - footerH;
   const contentH = footerY - pad;
 
@@ -162,28 +164,28 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   for (const line of ice.lines) {
     y += ice.size;
     parts.push(
-      `<text x="${textX}" y="${y.toFixed(1)}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="${ice.size}" fill="${ink}" stroke="${ink}" stroke-width="0.9" paint-order="stroke fill" stroke-linejoin="round">${escapeXml(line)}</text>`,
+      `<text x="${textX}" y="${y.toFixed(1)}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="${ice.size}" fill="${ink}" stroke="${ink}" stroke-width="0.55" paint-order="stroke fill" stroke-linejoin="round">${escapeXml(line)}</text>`,
     );
     y += lineH(ice.size) - ice.size;
   }
 
-  // Footer strip
   const tag = flair.rarityTagPrint;
-  parts.push(`<rect x="${pad + (legendary ? 2 : 0)}" y="${footerY}" width="${W - pad * 2 - (legendary ? 4 : 0)}" height="${footerH}" rx="3" fill="${ink}"/>`);
-  const mainY = handshake ? footerY + 14 : footerY + footerH / 2 + 4.5;
-  // White halo under white fill = thicker glyphs after 1-bit threshold
-  const footerStroke = `stroke="${paper}" stroke-width="2.4" paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round"`;
-  parts.push(
-    `<text x="${pad + 8}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="12" letter-spacing="0.8" fill="${paper}" ${footerStroke}>${escapeXml(EVENT.tag)}</text>`,
-  );
-  parts.push(
-    `<text x="${W - pad - 8}" y="${mainY}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="12" letter-spacing="0.6" fill="${paper}" ${footerStroke}>${escapeXml(tag)}</text>`,
-  );
+  const barY = H - pad - barH;
+  // Handshake above the bar in ink. Black bar = event tag + rarity only (clean white fill, no stroke).
   if (handshake) {
+    const hy = barY - 5;
     parts.push(
-      `<text x="${pad + 8}" y="${footerY + footerH - 7}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="${Math.max(handshake.size, 10)}" fill="${paper}" ${footerStroke}>${escapeXml(handshake.lines[0] ?? "")}</text>`,
+      `<text x="${textX}" y="${hy.toFixed(1)}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="${handshake.size}" fill="${ink}">${escapeXml(handshake.lines[0] ?? "")}</text>`,
     );
   }
+  parts.push(`<rect x="${pad + (legendary ? 2 : 0)}" y="${barY}" width="${W - pad * 2 - (legendary ? 4 : 0)}" height="${barH}" rx="3" fill="${ink}"/>`);
+  const mainY = barY + barH / 2 + 4;
+  parts.push(
+    `<text x="${pad + 8}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="11" letter-spacing="0.6" fill="${paper}">${escapeXml(EVENT.tag)}</text>`,
+  );
+  parts.push(
+    `<text x="${W - pad - 8}" y="${mainY}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="11" letter-spacing="0.5" fill="${paper}">${escapeXml(tag)}</text>`,
+  );
 
   const dims = opts.responsive ? 'width="100%" height="100%"' : `width="${W}" height="${H}"`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" ${dims}>${parts.join("")}</svg>`;
