@@ -439,10 +439,26 @@ function feetMarkup(def: ShapeDef, ink: string): string {
 }
 
 /**
+ * Behavioural states from the Grok Bot design system. On the web they drive subtle CSS motion
+ * (see `.gb-*` rules in globals.css). Thermal print output never uses them: no motion, no gray.
+ */
+export const BOT_STATES = ["idle", "working", "waiting", "blocked", "thinking", "done"] as const;
+export type BotState = (typeof BOT_STATES)[number];
+
+export interface AvatarInnerOptions {
+  /** Wrap parts in `<g class="gb-*">` hooks so CSS can animate them. Off for print. */
+  animated?: boolean;
+}
+
+/**
  * Inner markup (no <svg> wrapper) in a 100×100 coordinate space.
  * Embed inside your own <svg> or a <g transform>.
  */
-export function avatarInner(spec: AvatarSpec, colors: AvatarColors = SCREEN_COLORS): string {
+export function avatarInner(
+  spec: AvatarSpec,
+  colors: AvatarColors = SCREEN_COLORS,
+  opts: AvatarInnerOptions = {},
+): string {
   const def = SHAPE_DEFS[spec.shape];
   const { ink, paper } = colors;
   const solid = spec.style === "solid";
@@ -457,17 +473,21 @@ export function avatarInner(spec: AvatarSpec, colors: AvatarColors = SCREEN_COLO
   }
   const detail = def.detail ? def.detail.replace(/\{MARK\}/g, mark) : "";
 
-  return [
-    spec.feet ? feetMarkup(def, ink) : "",
-    // Accessories that sit behind the body outline are drawn first.
-    spec.top === "ears" ? topMarkup(spec, def, ink, paper) : "",
-    body,
-    detail,
-    eyesMarkup(spec, def, mark, bodyFill),
-    mouthMarkup(spec, def, mark),
-    faceMarkup(spec, def, mark),
-    spec.top !== "ears" ? topMarkup(spec, def, ink, paper) : "",
-  ].join("");
+  const feet = spec.feet ? feetMarkup(def, ink) : "";
+  // Accessories that sit behind the body outline are drawn first.
+  const behind = spec.top === "ears" ? topMarkup(spec, def, ink, paper) : "";
+  const eyes = eyesMarkup(spec, def, mark, bodyFill);
+  const face = mouthMarkup(spec, def, mark) + faceMarkup(spec, def, mark);
+  const top = spec.top !== "ears" ? topMarkup(spec, def, ink, paper) : "";
+
+  if (!opts.animated) {
+    return feet + behind + body + detail + eyes + face + top;
+  }
+  const g = (cls: string, inner: string) => (inner ? `<g class="${cls}">${inner}</g>` : "");
+  return g(
+    "gb-all",
+    g("gb-feet", feet) + g("gb-body", behind + body + detail) + g("gb-eyes", eyes) + g("gb-face", face) + g("gb-top", top),
+  );
 }
 
 export interface AvatarSvgOptions {
@@ -476,17 +496,23 @@ export interface AvatarSvgOptions {
   /** Fill the square background with `paper`. */
   background?: boolean;
   className?: string;
+  /** Web-only behavioural state; enables the animation hooks. */
+  state?: BotState;
+  /** Stagger animations (seconds) so a crowd of bots doesn't move in lockstep. */
+  delay?: number;
 }
 
 export function avatarSvg(spec: AvatarSpec, opts: AvatarSvgOptions = {}): string {
   const size = opts.size ?? 100;
   const colors = opts.colors ?? SCREEN_COLORS;
   const bg = opts.background ? `<rect width="100" height="100" fill="${colors.paper}"/>` : "";
-  const cls = opts.className ? ` class="${opts.className}"` : "";
+  const classes = [opts.className, opts.state ? `gb gb-${opts.state}` : ""].filter(Boolean).join(" ");
+  const cls = classes ? ` class="${classes}"` : "";
+  const style = opts.state && opts.delay ? ` style="--gb-delay:${opts.delay.toFixed(2)}s"` : "";
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}"${cls} role="img" aria-label="Grok Bot avatar">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}"${cls}${style} role="img" aria-label="Grok Bot avatar${opts.state ? `, ${opts.state}` : ""}">` +
     bg +
-    avatarInner(spec, colors) +
+    avatarInner(spec, colors, { animated: !!opts.state }) +
     `</svg>`
   );
 }

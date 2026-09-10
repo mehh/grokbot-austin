@@ -64,7 +64,7 @@ export default function LandingPage() {
           <div className="flex w-max animate-marquee gap-10 px-4 hover:[animation-play-state:paused]">
             {[...SAMPLE_BOTS, ...SAMPLE_BOTS].map(([bot, human], i) => (
               <div key={`${bot}-${i}`} className="flex flex-col items-center gap-2">
-                <Avatar botName={bot} personName={human} size={72} />
+                <Avatar botName={bot} personName={human} size={72} state="idle" delay={(i % 7) * 0.45} />
                 <div className="text-center">
                   <div className="text-xs font-bold">{bot}</div>
                   <div className="text-[10px] text-muted">w/ {human}</div>

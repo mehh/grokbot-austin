@@ -150,3 +150,216 @@ body {
 .kbd {
   @apply rounded border border-line bg-neutral-900 px-1.5 py-0.5 text-[11px] text-neutral-300;
 }
+
+/* ------------------------------------------------------------------ */
+/* Grok Bot behavioural states — web preview only, never on the label */
+/* idle · working · waiting · blocked · thinking · done                */
+/* ------------------------------------------------------------------ */
+.gb .gb-all,
+.gb .gb-body,
+.gb .gb-eyes,
+.gb .gb-face,
+.gb .gb-top,
+.gb .gb-feet {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation-delay: var(--gb-delay, 0s);
+}
+.gb .gb-eyes {
+  transform-origin: 50% 50%;
+}
+
+/* idle — calm, curious: slow breathing + occasional blink */
+.gb-idle .gb-all {
+  animation: gb-breathe 3.6s ease-in-out infinite;
+}
+.gb-idle .gb-eyes {
+  animation: gb-blink 4.8s ease-in-out infinite;
+}
+
+/* working — busy: quick bob, eyes scanning */
+.gb-working .gb-all {
+  animation: gb-bob 0.7s ease-in-out infinite;
+}
+.gb-working .gb-eyes {
+  animation: gb-scan 1.4s ease-in-out infinite;
+}
+.gb-working .gb-top {
+  animation: gb-wiggle 0.7s ease-in-out infinite;
+}
+
+/* waiting — patient sway, looking around, blinks */
+.gb-waiting .gb-all {
+  animation: gb-sway 2.8s ease-in-out infinite;
+}
+.gb-waiting .gb-eyes {
+  animation: gb-glance 5.6s ease-in-out infinite;
+}
+
+/* blocked — head-shake, squint */
+.gb-blocked .gb-all {
+  animation: gb-shake 2.6s ease-in-out infinite;
+}
+.gb-blocked .gb-eyes {
+  animation: gb-squint 2.6s ease-in-out infinite;
+}
+
+/* thinking — tilt, eyes up, gentle float */
+.gb-thinking .gb-all {
+  animation: gb-ponder 3.2s ease-in-out infinite;
+}
+.gb-thinking .gb-eyes {
+  animation: gb-lookup 3.2s ease-in-out infinite;
+}
+
+/* done — one pop, then settle into a happy breathe */
+.gb-done .gb-all {
+  animation:
+    gb-pop 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.4) 1,
+    gb-breathe 3.6s ease-in-out 0.7s infinite;
+}
+.gb-done .gb-top {
+  animation: gb-wiggle 0.7s ease-in-out 1;
+}
+
+@keyframes gb-breathe {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.02, 1.035);
+  }
+}
+@keyframes gb-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.08);
+  }
+}
+@keyframes gb-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2.5px) scale(1.01, 0.99);
+  }
+}
+@keyframes gb-scan {
+  0%,
+  100% {
+    transform: translateX(-2px);
+  }
+  50% {
+    transform: translateX(2px);
+  }
+}
+@keyframes gb-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-6deg);
+  }
+  70% {
+    transform: rotate(6deg);
+  }
+}
+@keyframes gb-sway {
+  0%,
+  100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(2.5deg);
+  }
+}
+@keyframes gb-glance {
+  0%,
+  35%,
+  100% {
+    transform: translate(0, 0);
+  }
+  45%,
+  60% {
+    transform: translate(2.5px, -1px);
+  }
+  70%,
+  85% {
+    transform: translate(-2px, 0);
+  }
+}
+@keyframes gb-shake {
+  0%,
+  60%,
+  100% {
+    transform: translateX(0);
+  }
+  65%,
+  75%,
+  85% {
+    transform: translateX(-2.5px);
+  }
+  70%,
+  80%,
+  90% {
+    transform: translateX(2.5px);
+  }
+}
+@keyframes gb-squint {
+  0%,
+  55%,
+  100% {
+    transform: scaleY(1);
+  }
+  62%,
+  92% {
+    transform: scaleY(0.55);
+  }
+}
+@keyframes gb-ponder {
+  0%,
+  100% {
+    transform: rotate(-4deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-5deg) translateY(-1.5px);
+  }
+}
+@keyframes gb-lookup {
+  0%,
+  100% {
+    transform: translate(1.5px, -2px);
+  }
+  50% {
+    transform: translate(2.5px, -2.5px);
+  }
+}
+@keyframes gb-pop {
+  0% {
+    transform: scale(0.9);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gb .gb-all,
+  .gb .gb-body,
+  .gb .gb-eyes,
+  .gb .gb-face,
+  .gb .gb-top,
+  .gb .gb-feet {
+    animation: none !important;
+  }
+}

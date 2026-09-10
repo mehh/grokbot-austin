@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Avatar } from "@/components/Avatar";
+import { LiveAvatar } from "@/components/LiveAvatar";
 import { BadgeActions } from "@/components/BadgeActions";
 import { PrintStatus } from "@/components/PrintStatus";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
@@ -52,7 +52,13 @@ export default async function BadgePage({ params, searchParams }: { params: Para
           <div className="card relative overflow-hidden p-6 sm:p-8">
             <div className="grid-bg pointer-events-none absolute inset-0" aria-hidden />
             <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center">
-              <Avatar botName={badge.botName} personName={badge.name} size={168} className="shrink-0 self-center sm:self-start" />
+              <LiveAvatar
+                botName={badge.botName}
+                personName={badge.name}
+                size={168}
+                className="shrink-0 self-center sm:self-start"
+                initialStatus={isNew ? "queued" : "loading"}
+              />
               <div className="min-w-0">
                 <h1 className="text-3xl leading-tight font-bold tracking-tight break-words sm:text-5xl">{badge.name}</h1>
                 <div className="mt-3 text-[11px] tracking-[0.2em] text-muted uppercase">Grok Bot ▸</div>

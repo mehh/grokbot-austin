@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+const STATUS_EVENT = "gb:status";
+
 type Status = "queued" | "printing" | "printed" | "failed" | "missing" | "loading";
 
 interface Job {
@@ -62,6 +64,10 @@ export function PrintStatus({ badgeId, initial }: { badgeId: string; initial?: S
       if (timer) clearTimeout(timer);
     };
   }, [badgeId]);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(STATUS_EVENT, { detail: status }));
+  }, [status]);
 
   const c = COPY[status];
   const agentOnline = agent ? Date.now() - agent.lastSeen < 20_000 : false;

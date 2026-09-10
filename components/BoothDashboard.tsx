@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Avatar } from "./Avatar";
+import { Avatar, stateForStatus } from "./Avatar";
 
 type JobStatus = "queued" | "printing" | "printed" | "failed";
 
@@ -392,7 +392,7 @@ function JobRow({
   return (
     <li className={`card animate-flash flex flex-wrap items-center gap-3 p-3 ${compact ? "opacity-80" : ""}`}>
       {typeof index === "number" ? <span className="w-5 text-right text-[11px] text-dim tabular-nums">{index + 1}</span> : null}
-      <Avatar botName={job.botName} personName={job.name} size={compact ? 32 : 44} />
+      <Avatar botName={job.botName} personName={job.name} size={compact ? 32 : 44} state={compact ? undefined : stateForStatus(job.status)} />
       <div className="min-w-0 flex-1 basis-40">
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate text-sm font-bold">{job.name}</span>

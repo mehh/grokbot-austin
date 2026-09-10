@@ -22,11 +22,22 @@ export function ClaimForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [typingUntil, setTypingUntil] = useState(0);
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
     const t = setInterval(() => setTick((v) => v + 1), 2600);
     return () => clearInterval(t);
   }, []);
+
+  // Cheap "am I typing?" clock for the avatar's thinking state.
+  useEffect(() => {
+    if (!typingUntil) return;
+    const t = setInterval(() => setNow(Date.now()), 400);
+    return () => clearInterval(t);
+  }, [typingUntil]);
+  const typing = typingUntil > (now || Date.now());
+  const botState = busy ? "working" : typing ? "thinking" : "idle";
 
   useEffect(() => {
     try {
@@ -89,7 +100,7 @@ export function ClaimForm() {
         </div>
         <LabelPreview badge={preview} />
         <div className="mt-3 flex items-center gap-3 text-[11px] text-muted">
-          <Avatar botName={preview.botName} personName={preview.name} size={28} />
+          <Avatar botName={preview.botName} personName={preview.name} size={28} state={botState} />
           <span className="truncate">{avatarDescription(spec)}</span>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-dim">
@@ -98,7 +109,7 @@ export function ClaimForm() {
       </div>
 
       {/* Fields */}
-      <div className="grid gap-5">
+      <div className="grid gap-5" onInput={() => setTypingUntil(Date.now() + 1500)}>
         <Field label="Your name" hint="required" count={name.length} max={LIMITS.name}>
           <input
             className="field"

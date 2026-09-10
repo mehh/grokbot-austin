@@ -10,10 +10,21 @@ Production: **https://grokbotaustin.vercel.app**
 
 ## Event ops in 2 minutes
 
-### 1. Deploy the web app (once)
+### 1. Deploy the web app (once, ~3 minutes)
 
-1. Import `https://github.com/mehh/grokbot-austin` into Vercel (framework auto-detects Next.js). Name the project **`grokbotaustin`** so production is `grokbotaustin.vercel.app` (rename/assign a domain in the Vercel UI if needed).
-2. Set env vars (Project → Settings → Environment Variables):
+**One-click:** [Deploy `grokbot-austin` to Vercel](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmehh%2Fgrokbot-austin&project-name=grokbotaustin&repository-name=grokbot-austin&env=BADGE_SECRET,BOOTH_TOKEN,NEXT_PUBLIC_BASE_URL&envDescription=BADGE_SECRET%3A%20any%20random%20string.%20BOOTH_TOKEN%3A%20party%20password%20(default%20austin-gtm-2026).%20NEXT_PUBLIC_BASE_URL%3A%20https%3A%2F%2Fgrokbotaustin.vercel.app) — pre-fills the project name and asks for the three env vars.
+
+**Or by hand:**
+
+1. [vercel.com/new](https://vercel.com/new) → **Import Git Repository** → pick `mehh/grokbot-austin` (install the Vercel GitHub app on the `mehh` account if it isn't listed).
+2. **Project Name:** `grokbotaustin`. Framework preset auto-detects **Next.js**; leave build/output/install commands at defaults. Root directory: `./`.
+3. Expand **Environment Variables** and add the values from the table below (at minimum `BADGE_SECRET`).
+4. **Deploy.** First build takes ~1–2 minutes.
+5. **Attach the domain `grokbotaustin.vercel.app`:** Project → **Settings → Domains**. If the project was named `grokbotaustin`, this domain is already the production alias. If Vercel generated something else (e.g. `grokbotaustin-abc123.vercel.app`), click **Add**, type `grokbotaustin.vercel.app`, and save — any unused `*.vercel.app` name can be claimed instantly, no DNS needed. To rename the project instead: Settings → General → Project Name → `grokbotaustin`.
+6. Confirm `NEXT_PUBLIC_BASE_URL` equals the final domain (QR codes and the bot prompt embed it). Changing an env var requires a **Redeploy** (Deployments → ⋯ → Redeploy).
+7. Smoke test: open `/booth` on the table device, `/prompt` on your phone, and `curl -X POST https://grokbotaustin.vercel.app/api/agent -H 'x-booth-token: austin-gtm-2026' -H 'Content-Type: application/json' -d '{"name":"Kris","botName":"Ledger"}'` should return `201` with a `previewUrl`.
+
+Env vars (Project → Settings → Environment Variables):
 
 | Var | Default | What it does |
 | --- | --- | --- |
@@ -23,7 +34,7 @@ Production: **https://grokbotaustin.vercel.app**
 | `ADMIN_TOKEN` | _(unset → uses `BOOTH_TOKEN`)_ | Optional. If set, only this token can mutate the queue (pause/reprint/agent). Keeps guests who read `/prompt` from driving the printer. |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | _(unset → in-memory)_ | Optional. Upstash Redis for a durable queue (Vercel Marketplace → Upstash → "Connect" adds these automatically; `UPSTASH_REDIS_REST_*` also works). |
 
-3. Deploy. One command from a laptop with the Vercel CLI: `npx vercel --prod`.
+CLI alternative from any laptop: `npx vercel link` (pick/create project `grokbotaustin`) then `npx vercel --prod`.
 
 > **Storage note.** Badge ids are self-contained (signed payload), so **previews and label PNGs always work with zero database**. The *print queue* is in-memory by default: it survives while the serverless instance is warm, which is fine for a one-night event with steady traffic, but a cold start drops pending jobs. For guaranteed durability add Upstash (2 minutes, free tier). Guests can always hit **"Print again"** on their badge page to re-queue.
 
@@ -109,7 +120,9 @@ print-agent/
 
 ### Avatars
 
-`hash(botName + personName)` → shape (blob, pebble, bean, egg, squircle, tablet, capsule, cylinder, hex, gem, crystal, wedge, shield, dome, arch, cloud, teardrop, leaf) × style (solid / outline) × eyes × mouth × accessory × face detail. Two colors only; reads at 90px on thermal paper. Inspired by [x.ai's Grok Bot design notes](https://x.ai/news/designing-grok-bot) and community shape libraries — all drawn from SVG primitives, no bitmaps.
+`hash(botName + personName)` → shape (blob, pebble, bean, egg, squircle, tablet, capsule, cylinder, hex, gem, crystal, wedge, shield, dome, arch, cloud, teardrop, leaf) × style (solid / outline) × eyes × mouth × accessory × face detail. Two colors only; reads at 90px on thermal paper. Follows [x.ai's Grok Bot design notes](https://x.ai/news/designing-grok-bot) — simple shapes, expressive eyes, controlled variation, one visual family — plus community shape libraries; all drawn from SVG primitives, no bitmaps.
+
+**Behavioural states (web only).** `idle · working · waiting · blocked · thinking · done` are CSS-driven motions (`.gb-<state>` in `globals.css`, `transform-box: fill-box`, honours `prefers-reduced-motion`). They are mapped from real app events: badge page follows the print status (`queued→waiting`, `printing→working`, `printed→done`, `failed→blocked`), the claim form's bot *thinks* while you type and *works* while submitting, booth queue rows mirror job status, the landing marquee idles with staggered delays. `<Avatar state="…" />` opts in; the print path (`PRINT_COLORS`, no `state`) emits static, unwrapped, pure black/white SVG — no motion, no gray fills.
 
 ### Queue API cheatsheet
 
