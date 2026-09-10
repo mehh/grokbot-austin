@@ -157,10 +157,10 @@ export class M110Browser {
   }
 
   /** Fetch a label PNG, threshold it in a canvas, and print it. */
-  async printPngUrl(url: string, width = 320, height = 240) {
+  async printPngUrl(url: string, width = 320, height = 160) {
     const { raster, widthBytes } = await pngUrlToRaster(url, width, height);
-    // Trim a few trailing lines so M110 gap seek doesn't spit a blank (matches print-agent).
-    const trim = 6;
+    // Small trim OK on 40×20 (height matches stock); keep tiny safety margin.
+    const trim = 2;
     const lines = Math.max(32, height - trim);
     await this.printRaster(raster.subarray(0, widthBytes * lines), widthBytes, lines);
   }

@@ -2,7 +2,7 @@
 
 **Grok Bot for GTM · Austin build night — the badge booth.** Bots talking to bots.
 
-Guests (or their Grok Bots) claim a badge → it lands in a print queue → a laptop at the table auto-prints it on a **Phomemo M110** (40×30mm thermal label) with a procedurally generated blobby Grok Bot avatar.
+Guests (or their Grok Bots) claim a badge → it lands in a print queue → a laptop at the table auto-prints it on a **Phomemo M110** (40×20mm thermal label) with a procedurally generated blobby Grok Bot avatar.
 
 Production: **https://grokbotaustin.vercel.app**
 
@@ -130,7 +130,7 @@ curl -s -X POST https://grokbotaustin.vercel.app/api/claim \
 ```
 
 1. Open the `previewUrl` on a phone → status card shows **Print queued** → flips to **Printing…** → **Printed ✓** once the agent runs.
-2. `curl -o t.png "<labelUrl>"` → 320×240 1-bit PNG.
+2. `curl -o t.png "<labelUrl>"` → 320×160 1-bit PNG.
 3. Via prompt: on `/`, tap **Copy prompt for your Grok Bot**, paste into Grok, answer its questions, open the link it returns. The claim should appear on `/booth` and `/live` within 3s and print within ~10s.
 4. `/booth`: agent pill green, auto-print ON, **Test print** produces a calibration label.
 
@@ -143,14 +143,14 @@ curl -s -X POST https://grokbotaustin.vercel.app/api/claim \
 ```bash
 pip install git+https://github.com/mkuhlmann/pyphomemo
 curl -o badge.png "https://grokbotaustin.vercel.app/api/label/<badgeId>.png"   # or ↓ Label PNG on any badge page
-phomemo print-image badge.png --label 40x30 --addr q450E5CQ7550085
+phomemo print-image badge.png --label 40x20 --addr q450E5CQ7550085
 ```
 
 `phomemo scan` lists nearby printers if the serial doesn't resolve. `export PHOMEMO_ADDR=q450E5CQ7550085` saves typing `--addr`.
 
 **If Web Bluetooth / pyphomemo prints fail after pairing in macOS System Settings:** unpair (Bluetooth → ⓘ → Forget This Device), power-cycle the M110, and let Chrome or pyphomemo own the BLE session — macOS-level pairing grabs the classic profile and blocks the LE writes. Kris's unit is currently connected under the id `q450E5CQ7550085`; only unpair if prints actually fail.
 
-**Phone app** — download the label PNG from any badge page (`↓ Label PNG`) and print it from the Phomemo app at 40×30mm.
+**Phone app** — download the label PNG from any badge page (`↓ Label PNG`) and print it from the Phomemo app at 40×20mm.
 
 **Browser** — `/booth` is also reachable from Chrome; the agent is the print path, so no Web Bluetooth pairing dance is needed at the table.
 
@@ -177,7 +177,7 @@ lib/
   flair.ts               icebreakers, rarity roll, bingo, live-feed copy (all hashed from the two names)
   webble.ts              Web Bluetooth M110 driver for the /booth fallback (Chrome/Edge)
   avatar.ts              procedural SVG avatars (18 shapes · 10 eyes · accessories)
-  label.ts               320×240 label layout, text fitting
+  label.ts               320×160 label layout, text fitting
   render.ts              resvg → threshold → real 1-bit PNG
   badge.ts               HMAC-signed self-describing badge ids
   store.ts               queue store: in-memory or Upstash Redis (atomic claim via Lua)

@@ -16,7 +16,7 @@ Options:
     --once          process the queue once and exit
     --scan          list nearby BLE devices and exit
     --test          print a test label and exit
-    --label 40x30   label size in mm (default 40x30 → 320×240 dots)
+    --label 40x20   label size in mm (default 40x20 → 320×160 dots)
     --density 15    1 (light) .. 15 (dark)
 
 Protocol notes (M110, reverse-engineered by phomemo-tools / phomymo / pyphomemo):
@@ -70,7 +70,7 @@ DELAY_INIT = 0.03
 DELAY_BEFORE_FOOTER = float(os.environ.get("DELAY_BEFORE", "0.30"))
 DELAY_AFTER_FOOTER = float(os.environ.get("DELAY_AFTER", "0.50"))
 PX_PER_MM = 8
-# Print head max is 384 dots; for a label use width_bytes = width // 8 (e.g. 40 for 40x30).
+# Print head max is 384 dots; for a label use width_bytes = width // 8 (e.g. 40 for 40x20).
 # Do NOT pad rows to 48 — that caused vertical stripes on Kris's M110 (pyphomemo ground truth).
 HEAD_WIDTH = 384
 
@@ -142,7 +142,7 @@ class Booth:
 def parse_label(spec: str) -> tuple[int, int]:
     m = re.fullmatch(r"\s*(\d+)\s*[xX×]\s*(\d+)\s*", spec)
     if not m:
-        raise ValueError("label must look like 40x30 (mm)")
+        raise ValueError("label must look like 40x20 (mm)")
     w = int(m.group(1)) * PX_PER_MM
     h = int(m.group(2)) * PX_PER_MM
     w -= w % 8
@@ -193,9 +193,9 @@ def png_to_raster(
             f"unexpected raster length {len(raster)}; "
             f"expected {width_bytes * out_height} for {width}x{out_height}"
         )
-    # Leave a few white lines unprinted so the M110 gap sensor doesn't seek an extra blank label.
-    # Full 240-dot height on 40x30 stock often overshoots into the next gap.
-    trim = max(0, min(8, int(os.environ.get("RASTER_TRIM", "6"))))
+    # Tiny trim only — 40×20 stock is 160 dots tall, so height now matches the media.
+    # Overshoot/gap-hunt was from printing 240-tall artwork on 20mm labels.
+    trim = max(0, min(8, int(os.environ.get("RASTER_TRIM", "2"))))
     if trim and out_height > trim + 32:
         out_height -= trim
         raster = raster[: width_bytes * out_height]
@@ -207,13 +207,18 @@ def test_label_png(width: int, height: int) -> bytes:
 
     img = Image.new("1", (width, height), 1)
     d = ImageDraw.Draw(img)
-    d.rectangle((4, 4, width - 5, height - 5), outline=0, width=3)
-    d.rectangle((16, height - 44, width - 17, height - 16), fill=0)
-    for i in range(0, width - 40, 16):
-        d.rectangle((20 + i, 20, 20 + i + 8, 60), fill=0)
-    d.ellipse((width // 2 - 40, 70, width // 2 + 40, 150), fill=0)
-    d.ellipse((width // 2 - 22, 95, width // 2 - 6, 111), fill=1)
-    d.ellipse((width // 2 + 6, 95, width // 2 + 22, 111), fill=1)
+    d.rectangle((3, 3, width - 4, height - 4), outline=0, width=2)
+    foot_top = max(height - 28, height // 2)
+    d.rectangle((12, foot_top, width - 13, height - 8), fill=0)
+    bar_h = max(8, height // 8)
+    for i in range(0, width - 36, 14):
+        d.rectangle((16 + i, 10, 16 + i + 7, 10 + bar_h), fill=0)
+    cy = 10 + bar_h + max(18, (foot_top - (10 + bar_h)) // 2)
+    r = min(28, max(16, (foot_top - 10 - bar_h) // 2 - 4))
+    d.ellipse((width // 2 - r, cy - r, width // 2 + r, cy + r), fill=0)
+    er = max(4, r // 4)
+    d.ellipse((width // 2 - r // 2 - er, cy - er, width // 2 - r // 2 + er, cy + er), fill=1)
+    d.ellipse((width // 2 + r // 2 - er, cy - er, width // 2 + r // 2 + er, cy + er), fill=1)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -682,7 +687,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--url", default=os.environ.get("BOOTH_URL", DEFAULT_URL), help="web app base URL (BOOTH_URL)")
     p.add_argument("--token", default=os.environ.get("BOOTH_TOKEN", DEFAULT_TOKEN), help="booth token (BOOTH_TOKEN)")
     p.add_argument("--addr", default=os.environ.get("PHOMEMO_ADDR", DEFAULT_ADDR), help="printer BLE name/serial or MAC/UUID (PHOMEMO_ADDR)")
-    p.add_argument("--label", default=os.environ.get("LABEL", "40x30"), help="label size in mm, e.g. 40x30")
+    p.add_argument("--label", default=os.environ.get("LABEL", "40x20"), help="label size in mm, e.g. 40x20")
     p.add_argument("--density", type=int, default=int(os.environ.get("DENSITY", "15")), help="1..15")
     p.add_argument("--speed", type=int, default=int(os.environ.get("SPEED", "5")), help="1..5")
     p.add_argument("--threshold", type=int, default=128, help="gray → black cutoff (0..255)")

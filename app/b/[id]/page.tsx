@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return {
     title: `${badge.name} × ${badge.botName}`,
     description: badge.title ? `${badge.botName}, ${badge.title}` : `${badge.botName} — Grok Bot Austin badge`,
-    openGraph: { images: [{ url: `${labelUrl}?scale=3`, width: 960, height: 720 }] },
+    openGraph: { images: [{ url: `${labelUrl}?scale=3`, width: 960, height: 480 }] },
   };
 }
 
@@ -119,7 +119,7 @@ export default async function BadgePage({ params, searchParams }: { params: Para
           <div>
             <div className="mb-2 flex items-center justify-between text-[11px] tracking-[0.18em] text-muted uppercase">
               <span>what the printer sees</span>
-              <span className="text-dim">320×240 · 1-bit</span>
+              <span className="text-dim">320×160 · 1-bit</span>
             </div>
             {/* Actual rendered PNG so the preview is exactly what prints */}
             {/* eslint-disable-next-line @next/next/no-img-element */}

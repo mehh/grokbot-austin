@@ -7,7 +7,7 @@ export const maxDuration = 15;
 
 /**
  * GET /api/label/<badgeId>.png[?scale=2]
- * Print-ready 1-bit PNG (320×240 @ scale 1 = 40×30mm on a Phomemo M110).
+ * Print-ready 1-bit PNG (320×160 @ scale 1 = 40×20mm on a Phomemo M110).
  */
 export async function GET(req: Request, ctx: { params: Promise<{ file: string }> }) {
   const { file } = await ctx.params;
@@ -30,7 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ file: string }>
         "Content-Length": String(png.length),
         "Cache-Control": "public, max-age=31536000, immutable",
         "X-Label-Width": "320",
-        "X-Label-Height": "240",
+        "X-Label-Height": "160",
         ...(download ? { "Content-Disposition": `attachment; filename="grokbot-${safeName}.png"` } : {}),
       },
     });

@@ -104,7 +104,7 @@ export default function LandingPage() {
             title="Paste to your bot"
             body={`Your Grok Bot asks for your name, picks its own title, writes one witty line, and POSTs the claim to our API. Optional: it sends a one-line handshake to ${HOST_BOT}, the host bot at the table.`}
           />
-          <Step n="04" title="It prints itself" body="Your bot replies with a link. The booth's M110 picks the job up within seconds and prints a 40×30mm label." />
+          <Step n="04" title="It prints itself" body="Your bot replies with a link. The booth's M110 picks the job up within seconds and prints a 40×20mm label." />
           <Step n="05" title="Peel · stick · talk" body="Your label has an icebreaker and a rarity tag. Read someone else's out loud. That's the meetup." />
         </ol>
       </section>

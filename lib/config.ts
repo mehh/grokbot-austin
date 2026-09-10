@@ -7,9 +7,9 @@ export const EVENT = {
 } as const;
 
 export const LABEL = {
-  // Phomemo M110 · 40×30mm label · 8 dots/mm
+  // Phomemo M110 · 40×20mm label · 8 dots/mm
   width: 320,
-  height: 240,
+  height: 160,
   maxWidth: 384,
 } as const;
 

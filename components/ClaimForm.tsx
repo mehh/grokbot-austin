@@ -101,7 +101,7 @@ export function ClaimForm() {
       {/* Preview */}
       <div className="order-first lg:order-last lg:sticky lg:top-20">
         <div className="mb-2 flex items-center justify-between text-[11px] tracking-[0.18em] text-muted uppercase">
-          <span>live label · 40×30mm</span>
+          <span>live label · 40×20mm</span>
           <span className="text-dim">updates as you type</span>
         </div>
         <LabelPreview badge={preview} />

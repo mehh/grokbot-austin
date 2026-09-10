@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {EVENT.tag} · {EVENT.tagline}
             </span>
             <span>
-              prints on a Phomemo M110 · 40×30mm · 1-bit ·{" "}
+              prints on a Phomemo M110 · 40×20mm · 1-bit ·{" "}
               <a href="https://github.com/mehh/grokbot-austin" className="underline-offset-2 hover:text-white hover:underline">
                 source
               </a>
