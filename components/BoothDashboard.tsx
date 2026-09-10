@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar, stateForStatus } from "./Avatar";
 import { BrowserPrinterCard, useBrowserPrinter } from "./BrowserPrinter";
+import { flairFor } from "@/lib/flair";
 
 type JobStatus = "queued" | "printing" | "printed" | "failed";
 
@@ -212,6 +213,7 @@ export function BoothDashboard({ prefillToken, claimUrl, printerName }: { prefil
     [history],
   );
   const stale = lastFetch ? Date.now() - lastFetch > POLL_MS * 4 : false;
+  const nowPrinting = active.find((j) => j.status === "printing") ?? null;
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 pt-6 pb-16">
@@ -254,6 +256,9 @@ export function BoothDashboard({ prefillToken, claimUrl, printerName }: { prefil
           {error}
         </div>
       ) : null}
+
+      {/* NOW PRINTING — big enough to gather a crowd */}
+      {nowPrinting ? <NowPrinting job={nowPrinting} /> : null}
 
       {/* Controls + counts */}
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -380,6 +385,41 @@ export function BoothDashboard({ prefillToken, claimUrl, printerName }: { prefil
         </aside>
       </div>
     </div>
+  );
+}
+
+function NowPrinting({ job }: { job: Job }) {
+  const flair = flairFor(job.botName, job.name);
+  return (
+    <section className="scanlines card animate-rise mt-6 overflow-hidden border-white/40">
+      <div className="grid gap-6 p-5 sm:grid-cols-[auto_1fr_auto] sm:items-center sm:p-6">
+        <Avatar botName={job.botName} personName={job.name} size={128} state="working" className="justify-self-center" />
+        <div className="min-w-0 text-center sm:text-left">
+          <div className="flex items-center justify-center gap-2 text-[11px] tracking-[0.24em] text-muted uppercase sm:justify-start">
+            <span className="h-2 w-2 animate-pulse-soft rounded-full bg-white" /> now printing
+            {flair.rarity !== "common" ? <span className="rounded-full border border-white px-2 py-0.5 text-[9px] font-bold text-white">{flair.rarityTag}</span> : null}
+          </div>
+          <div className="mt-2 truncate text-3xl font-bold tracking-tight sm:text-5xl">{job.name}</div>
+          <div className="mt-1 truncate text-lg text-neutral-300">
+            × {job.botName}
+            {job.title ? <span className="text-muted"> · {job.title}</span> : null}
+          </div>
+          <div className="mt-3 text-xs text-neutral-400">
+            <span className="text-dim">&gt; </span>
+            {flair.icebreaker}
+          </div>
+          <div className="mt-4 h-1 w-full overflow-hidden rounded bg-neutral-800">
+            <div className="h-full w-1/3 animate-marquee rounded bg-white" style={{ animationDuration: "1.6s" }} />
+          </div>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/api/label/${encodeURIComponent(job.badgeId)}.png?scale=2`}
+          alt=""
+          className="pixelated hidden w-64 rounded-md bg-white shadow-[0_0_0_1px_rgba(255,255,255,0.2)] lg:block"
+        />
+      </div>
+    </section>
   );
 }
 

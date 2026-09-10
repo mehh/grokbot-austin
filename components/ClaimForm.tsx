@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Badge } from "@/lib/badge";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
 import { HOST_BOT, LIMITS } from "@/lib/config";
+import { flairFor } from "@/lib/flair";
 import { Avatar } from "./Avatar";
 import { LabelPreview } from "./LabelPreview";
 
@@ -20,6 +21,7 @@ export function ClaimForm() {
   const [quote, setQuote] = useState("");
   const [handshake, setHandshake] = useState("");
   const [website, setWebsite] = useState("");
+  const [sound, setSound] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -65,6 +67,7 @@ export function ClaimForm() {
   );
 
   const spec = avatarSpec(preview.botName, preview.name);
+  const flair = flairFor(preview.botName, preview.name);
   const ready = name.trim().length > 0 && botName.trim().length > 0;
 
   async function submit(e: React.FormEvent) {
@@ -85,6 +88,7 @@ export function ClaimForm() {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || `Claim failed (${res.status})`);
+      if (sound) click();
       router.push(`/b/${encodeURIComponent(data.id)}?new=1`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -104,6 +108,13 @@ export function ClaimForm() {
         <div className="mt-3 flex items-center gap-3 text-[11px] text-muted">
           <Avatar botName={preview.botName} personName={preview.name} size={28} state={botState} />
           <span className="truncate">{avatarDescription(spec)}</span>
+          {ready ? (
+            <span className={`ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-[0.18em] uppercase ${
+              flair.rarity === "legendary" ? "border-white bg-white text-black" : flair.rarity === "rare" ? "border-white/60 text-white" : "border-line text-dim"
+            }`}>
+              {flair.rarity}
+            </span>
+          ) : null}
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-dim">
           Your bot is derived from both names. Same names → same bot, every time. Want a different look? Try a nickname.
@@ -198,10 +209,33 @@ export function ClaimForm() {
             )}
           </button>
           <span className="text-[11px] text-dim">Queues instantly. The booth printer picks it up in a few seconds.</span>
+          <button type="button" onClick={() => setSound((v) => !v)} className="text-[11px] text-dim hover:text-white sm:ml-auto" title="Soft click on claim">
+            {sound ? "🔈 click on" : "🔇 click off"}
+          </button>
         </div>
       </div>
     </form>
   );
+}
+
+/** Soft mechanical click, WebAudio only, never autoplayed. */
+function click() {
+  try {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "triangle";
+    o.frequency.setValueAtTime(1800, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.06);
+    g.gain.setValueAtTime(0.08, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.09);
+    o.connect(g).connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.1);
+  } catch {
+    /* no audio */
+  }
 }
 
 function Field({

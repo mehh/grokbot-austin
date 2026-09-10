@@ -6,6 +6,7 @@
 import type { Badge } from "./badge";
 import { PRINT_COLORS, avatarInner, avatarSpec } from "./avatar";
 import { EVENT, HOST_BOT, LABEL } from "./config";
+import { flairFor } from "./flair";
 
 export const LABEL_FONT_FAMILY = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
 /** Geist Mono advance width as a fraction of font-size. */
@@ -84,6 +85,8 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const { ink, paper } = PRINT_COLORS;
 
   const pad = 10;
+  const flair = flairFor(badge.botName, badge.name);
+  const legendary = flair.rarity === "legendary";
   const handshake = badge.handshake ? fitHandshake(badge.handshake, W - pad * 2 - 16) : null;
   const footerH = handshake ? 42 : 30;
   const footerY = H - pad - footerH;
@@ -100,21 +103,29 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const textX = avatarX + avatarSize + 12;
   const textW = W - pad - textX;
 
-  const name = fitText(badge.name.toUpperCase(), textW, 34, 16, 2);
-  const bot = fitText(badge.botName, textW, 20, 12, 1);
+  const name = fitText(badge.name.toUpperCase(), textW, 32, 16, 2);
+  const bot = fitText(badge.botName, textW, 19, 12, 1);
   const subtitle = badge.title || badge.vibe || "";
-  const sub = subtitle ? fitText(subtitle, textW, 13, 10, 2) : { lines: [], size: 13 };
+  const sub = subtitle ? fitText(subtitle, textW, 12, 10, 1) : { lines: [], size: 12 };
+  // Conversation starter — the whole point of wearing the thing.
+  const ice = fitText(`> ${flair.icebreaker}`, textW, 10, 8, 2);
 
   const lineH = (size: number) => Math.round(size * 1.1);
   const nameBlock = name.lines.length * lineH(name.size);
   const capH = 9;
   const botBlock = capH + 3 + lineH(bot.size);
-  const subBlock = sub.lines.length ? sub.lines.length * lineH(sub.size) + 6 : 0;
-  const total = nameBlock + 8 + botBlock + subBlock;
+  const subBlock = sub.lines.length ? sub.lines.length * lineH(sub.size) + 5 : 0;
+  const iceBlock = ice.lines.length * lineH(ice.size) + 9;
+  const total = nameBlock + 6 + botBlock + subBlock + iceBlock;
   let y = pad + Math.max(0, (contentH - total) / 2);
 
   const parts: string[] = [];
   parts.push(`<rect width="${W}" height="${H}" fill="${paper}"/>`);
+  if (legendary) {
+    // Double frame so a LEGENDARY reads from across the room.
+    parts.push(`<rect x="3" y="3" width="${W - 6}" height="${H - 6}" rx="6" fill="none" stroke="${ink}" stroke-width="3"/>`);
+    parts.push(`<rect x="8" y="8" width="${W - 16}" height="${H - 16}" rx="4" fill="none" stroke="${ink}" stroke-width="1.5"/>`);
+  }
   parts.push(avatar);
 
   // Person name
@@ -125,7 +136,7 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
     );
     y += lineH(name.size) - name.size;
   }
-  y += 8;
+  y += 6;
 
   // Bot caption + name
   y += capH;
@@ -140,7 +151,7 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
 
   // Title / vibe
   if (sub.lines.length) {
-    y += 6;
+    y += 5;
     for (const line of sub.lines) {
       y += sub.size;
       parts.push(
@@ -150,15 +161,27 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
     }
   }
 
+  // Icebreaker, separated by a thin rule
+  y += 6;
+  parts.push(`<rect x="${textX}" y="${y.toFixed(1)}" width="${Math.min(textW, 60)}" height="1.5" fill="${ink}"/>`);
+  y += 3;
+  for (const line of ice.lines) {
+    y += ice.size;
+    parts.push(
+      `<text x="${textX}" y="${y.toFixed(1)}" font-family="${LABEL_FONT_FAMILY}" font-weight="500" font-size="${ice.size}" fill="${ink}">${escapeXml(line)}</text>`,
+    );
+    y += lineH(ice.size) - ice.size;
+  }
+
   // Footer strip
-  const tag = badge.source === "bot" ? "BOT→BOT" : `#${shortCode(badge.id)}`;
-  parts.push(`<rect x="${pad}" y="${footerY}" width="${W - pad * 2}" height="${footerH}" rx="4" fill="${ink}"/>`);
+  const tag = flair.rarityTagPrint;
+  parts.push(`<rect x="${pad + (legendary ? 3 : 0)}" y="${footerY}" width="${W - pad * 2 - (legendary ? 6 : 0)}" height="${footerH}" rx="4" fill="${ink}"/>`);
   const mainY = handshake ? footerY + 19 : footerY + footerH / 2 + 5;
   parts.push(
     `<text x="${pad + 10}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="14" letter-spacing="1" fill="${paper}">${escapeXml(EVENT.tag)}</text>`,
   );
   parts.push(
-    `<text x="${W - pad - 10}" y="${mainY - 1}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="500" font-size="11" letter-spacing="1" fill="${paper}">${escapeXml(tag)}</text>`,
+    `<text x="${W - pad - 10}" y="${mainY - 1}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="${legendary ? 700 : 500}" font-size="11" letter-spacing="1" fill="${paper}">${escapeXml(tag)}</text>`,
   );
   if (handshake) {
     parts.push(

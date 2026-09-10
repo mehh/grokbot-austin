@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 import { LiveAvatar } from "@/components/LiveAvatar";
 import { BadgeActions } from "@/components/BadgeActions";
 import { PrintStatus } from "@/components/PrintStatus";
+import { ShareX, shareText } from "@/components/ShareX";
+import { SparkBurst } from "@/components/SparkBurst";
+import { flairFor } from "@/lib/flair";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
 import { badgeUrls, decodeBadge } from "@/lib/badge";
 import { EVENT, HOST_BOT } from "@/lib/config";
@@ -33,14 +36,19 @@ export default async function BadgePage({ params, searchParams }: { params: Para
   const { previewUrl } = badgeUrls(badge.id);
   const labelPath = `/api/label/${encodeURIComponent(badge.id)}.png`;
   const spec = avatarSpec(badge.botName, badge.name);
+  const flair = flairFor(badge.botName, badge.name);
   const isNew = sp?.new === "1";
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pt-8 pb-16 sm:pt-12">
       {isNew ? (
-        <div className="mb-6 animate-rise rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm">
-          <span className="font-bold">Claimed.</span> Your badge is in the print queue — head to the booth table.
-        </div>
+        <>
+          <SparkBurst count={flair.rarity === "legendary" ? 60 : 30} />
+          <div className="mb-6 animate-rise rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm">
+            <span className="font-bold">Claimed.</span> Your badge is in the print queue — head to the booth table.
+            {flair.rarity === "legendary" ? <span className="ml-2 font-bold">You pulled a LEGENDARY. Tell everyone.</span> : null}
+          </div>
+        </>
       ) : null}
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
@@ -60,6 +68,9 @@ export default async function BadgePage({ params, searchParams }: { params: Para
                 initialStatus={isNew ? "queued" : "loading"}
               />
               <div className="min-w-0">
+                <div className="mb-2">
+                  <RarityChip rarity={flair.rarity} tag={flair.rarityTag} />
+                </div>
                 <h1 className="text-3xl leading-tight font-bold tracking-tight break-words sm:text-5xl">{badge.name}</h1>
                 <div className="mt-3 text-[11px] tracking-[0.2em] text-muted uppercase">Grok Bot ▸</div>
                 <div className="text-xl font-bold break-words sm:text-2xl">{badge.botName}</div>
@@ -67,6 +78,11 @@ export default async function BadgePage({ params, searchParams }: { params: Para
                 {badge.vibe ? <p className="mt-3 text-sm leading-relaxed text-neutral-400">{badge.vibe}</p> : null}
               </div>
             </div>
+            <p className="relative mt-6 rounded-md border border-dashed border-white/25 px-3 py-2 text-sm text-neutral-100">
+              <span className="text-dim">&gt; </span>
+              {flair.icebreaker}
+              <span className="ml-2 text-[10px] tracking-[0.16em] text-dim uppercase">icebreaker · printed on your badge</span>
+            </p>
             {badge.quote ? (
               <blockquote className="relative mt-6 border-l-2 border-white/30 pl-4 text-sm leading-relaxed text-neutral-200 italic">
                 “{badge.quote}”
@@ -91,6 +107,9 @@ export default async function BadgePage({ params, searchParams }: { params: Para
           </div>
           <div className="mt-4">
             <BadgeActions badge={badge} labelUrl={labelPath} previewUrl={previewUrl} />
+          </div>
+          <div className="mt-6">
+            <ShareX text={shareText(flair.rarity, badge.botName)} url={previewUrl} />
           </div>
         </section>
 
@@ -119,4 +138,14 @@ export default async function BadgePage({ params, searchParams }: { params: Para
       </div>
     </div>
   );
+}
+
+function RarityChip({ rarity, tag }: { rarity: string; tag: string }) {
+  const cls =
+    rarity === "legendary"
+      ? "border-white bg-white text-black animate-pulse-soft"
+      : rarity === "rare"
+        ? "border-white/60 text-white"
+        : "border-line text-muted";
+  return <span className={`inline-block rounded-full border px-2.5 py-0.5 text-[10px] font-bold tracking-[0.2em] uppercase ${cls}`}>{tag}</span>;
 }

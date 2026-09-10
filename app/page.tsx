@@ -5,6 +5,7 @@ import { LiveStats } from "@/components/LiveStats";
 import { QR } from "@/components/QR";
 import { baseUrl, boothToken, EVENT, HOST_BOT } from "@/lib/config";
 import { botPrompt } from "@/lib/prompt";
+import { BINGO } from "@/lib/flair";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export default function LandingPage() {
       <div className="grid-bg pointer-events-none absolute inset-x-0 top-0 h-[60vh]" aria-hidden />
 
       {/* Hero */}
-      <section className="relative mx-auto grid w-full max-w-5xl gap-10 px-4 pt-12 pb-10 sm:pt-20 lg:grid-cols-[1fr_auto] lg:items-center">
+      <section className="scanlines relative mx-auto grid w-full max-w-5xl gap-10 px-4 pt-12 pb-10 sm:pt-20 lg:grid-cols-[1fr_auto] lg:items-center">
         <div className="animate-rise">
           <p className="mb-4 text-xs text-muted">
             <span className="text-white">$</span> grok-bot claim --event &quot;{EVENT.name}&quot; --city {EVENT.city.toLowerCase()}
@@ -43,8 +44,10 @@ export default function LandingPage() {
             to bots<span className="cursor" />
           </h1>
           <p className="mt-6 max-w-xl text-sm leading-relaxed text-neutral-300 sm:text-base">
-            Your Grok Bot claims a thermal badge for <em className="text-white not-italic">both of you</em>. Copy the prompt, paste it
-            to your bot, and the printer at the table does the rest.
+            Here&apos;s the trick: you don&apos;t fill in a form. <em className="text-white not-italic">Your Grok Bot does.</em> Copy one
+            prompt, paste it to your bot, and it negotiates a badge for both of you — its own title, a one-liner, a handshake with the
+            host bot — then the printer at the table spits it out. Every badge carries a conversation starter and a rarity roll.
+            About 1 in 20 is <span className="text-white">LEGENDARY</span>.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -102,7 +105,32 @@ export default function LandingPage() {
             body={`Your Grok Bot asks for your name, picks its own title, writes one witty line, and POSTs the claim to our API. Optional: it sends a one-line handshake to ${HOST_BOT}, the host bot at the table.`}
           />
           <Step n="04" title="It prints itself" body="Your bot replies with a link. The booth's M110 picks the job up within seconds and prints a 40×30mm label." />
-          <Step n="05" title="Peel · stick · post" body="Laptop lid or shirt. Same names → same blob, every time." />
+          <Step n="05" title="Peel · stick · talk" body="Your label has an icebreaker and a rarity tag. Read someone else's out loud. That's the meetup." />
+        </ol>
+      </section>
+
+      {/* Bot meetup bingo */}
+      <section className="mx-auto w-full max-w-5xl px-4 pb-12">
+        <div className="mb-4 flex items-end justify-between">
+          <div>
+            <p className="text-[11px] tracking-[0.18em] text-muted uppercase">bot meetup bingo</p>
+            <h2 className="mt-1 text-xl font-bold tracking-tight">Five things to do before you leave</h2>
+          </div>
+          <span className="hidden text-[11px] text-dim sm:block">badge-verified · honor system</span>
+        </div>
+        <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {BINGO.map((b, i) => (
+            <li key={b.id} className="card group relative p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] tracking-[0.2em] text-dim">{String(i + 1).padStart(2, "0")}</span>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-line text-[10px] text-dim transition group-hover:border-white group-hover:text-white">
+                  ✓
+                </span>
+              </div>
+              <h3 className="text-sm font-bold">{b.title}</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-neutral-400">{b.body}</p>
+            </li>
+          ))}
         </ol>
       </section>
 

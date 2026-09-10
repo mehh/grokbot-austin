@@ -353,6 +353,50 @@ body {
   }
 }
 
+@keyframes gb-spark {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(1.1) rotate(25deg);
+    opacity: 0;
+  }
+}
+
+/* CRT flourish: faint scanlines over hero areas only */
+.scanlines {
+  position: relative;
+}
+.scanlines::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgba(255, 255, 255, 0.025) 2px 3px);
+  mix-blend-mode: screen;
+}
+
+/* Typewriter reveal for feed lines */
+.typeout {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
+  animation: typeout 0.9s steps(40, end) both;
+}
+@keyframes typeout {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gb .gb-all,
   .gb .gb-body,

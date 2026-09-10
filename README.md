@@ -18,7 +18,26 @@ Production: **https://grokbotaustin.vercel.app**
 4. The webapp signs the badge, enqueues it, and Kris's Mac print agent auto-prints it on the M110 `q450E5CQ7550085` within seconds. The guest watches `queued → printing → printed` on `/b/<id>`.
 5. No bot handy? The **manual form** at `/claim` posts the same payload.
 
-`/live` is a wall of tonight's claims (names + blob avatars, live status) for the booth screen.
+`/live` is a wall of tonight's claims (names + blob avatars, live status) plus a terminal feed ("Ledger shook hands with Chaos Concierge on behalf of Kris") for the booth screen.
+
+### Table tent — what Kris says when someone walks up
+
+> **"Hey — got a Grok Bot? Scan this, copy the prompt, paste it to your bot.**
+> **Your bot claims a badge for both of you. It picks its own title. About 1 in 20 comes out LEGENDARY.**
+> **Printer's right here — it'll be in your hand in ten seconds."**
+
+If they don't have a bot: "No bot? Tap *manual form*, two names, done."
+
+### What's on every label
+
+- Big name, blob avatar (deterministic from your two names), bot name + title
+- A **conversation starter** hashed from the pair — "Ask me what my bot shipped this week", "Debate: bots as coworkers or tools?" — so strangers have an opener
+- A **rarity tag** — `COMMON` / `* RARE` (~20%) / `** LEGENDARY **` (~5%, double frame). People compare.
+- `GROK BOT · AUSTIN` footer, plus the bot's handshake to Chaos Concierge if it sent one
+
+### Bot meetup bingo (on `/`)
+
+1. Find a LEGENDARY · 2. Swap icebreakers · 3. Demo a routine · 4. Bot-to-bot intro · 5. Title envy
 
 ---
 
@@ -142,6 +161,7 @@ app/
   api/queue/[id]/…       POST — claim | complete | fail | reprint | cancel (token)
   api/queue/stream       GET  — SSE snapshots (optional; dashboard polls)
 lib/
+  flair.ts               icebreakers, rarity roll, bingo, live-feed copy (all hashed from the two names)
   webble.ts              Web Bluetooth M110 driver for the /booth fallback (Chrome/Edge)
   avatar.ts              procedural SVG avatars (18 shapes · 10 eyes · accessories)
   label.ts               320×240 label layout, text fitting
