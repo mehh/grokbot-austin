@@ -8,8 +8,26 @@ export function jobIdFor(badge: Badge): string {
   return `j${badge.createdAt.toString(36)}${sig.slice(0, 6)}`;
 }
 
+/** Collapse double-POSTs (bot retry / form double-click) into one job. */
+const CLAIM_DEDUPE_MS = 8_000;
+
+function sameGuest(a: { name: string; botName: string }, b: { name: string; botName: string }): boolean {
+  return a.name.trim().toLowerCase() === b.name.trim().toLowerCase() && a.botName.trim().toLowerCase() === b.botName.trim().toLowerCase();
+}
+
 export async function enqueueBadge(badge: Badge): Promise<Job> {
   const now = Date.now();
+  const store = getStore();
+  // Same guest within a few seconds → reuse existing job (queued/printing/just printed).
+  const recent = await store.listJobs(40);
+  const dup = recent.find(
+    (j) =>
+      sameGuest(j, badge) &&
+      now - j.createdAt < CLAIM_DEDUPE_MS &&
+      (j.status === "queued" || j.status === "printing" || j.status === "printed"),
+  );
+  if (dup) return dup;
+
   const job: Job = {
     id: jobIdFor(badge),
     badgeId: badge.id,
@@ -22,7 +40,7 @@ export async function enqueueBadge(badge: Badge): Promise<Job> {
     updatedAt: now,
     attempts: 0,
   };
-  await getStore().putJob(job);
+  await store.putJob(job);
   return job;
 }
 

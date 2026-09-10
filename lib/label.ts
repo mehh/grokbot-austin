@@ -104,19 +104,20 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const textW = W - pad - textX;
 
   const name = fitText(badge.name.toUpperCase(), textW, 32, 16, 2);
-  const bot = fitText(badge.botName, textW, 19, 12, 1);
+  const bot = fitText(badge.botName, textW, 20, 13, 1);
   const subtitle = badge.title || badge.vibe || "";
-  const sub = subtitle ? fitText(subtitle, textW, 12, 10, 1) : { lines: [], size: 12 };
+  const sub = subtitle ? fitText(subtitle, textW, 13, 11, 1) : { lines: [], size: 13 };
   // Conversation starter — the whole point of wearing the thing.
-  const ice = fitText(`> ${flair.icebreaker}`, textW, 10, 8, 2);
+  // Thermal needs ≥10pt; 12→10 keeps long icebreakers readable without overflowing.
+  const ice = fitText(`> ${flair.icebreaker}`, textW, 12, 10, 2);
 
-  const lineH = (size: number) => Math.round(size * 1.1);
+  const lineH = (size: number) => Math.round(size * 1.08);
   const nameBlock = name.lines.length * lineH(name.size);
-  const capH = 9;
-  const botBlock = capH + 3 + lineH(bot.size);
-  const subBlock = sub.lines.length ? sub.lines.length * lineH(sub.size) + 5 : 0;
-  const iceBlock = ice.lines.length * lineH(ice.size) + 9;
-  const total = nameBlock + 6 + botBlock + subBlock + iceBlock;
+  const capH = 11;
+  const botBlock = capH + 2 + lineH(bot.size);
+  const subBlock = sub.lines.length ? sub.lines.length * lineH(sub.size) + 4 : 0;
+  const iceBlock = ice.lines.length * lineH(ice.size) + 8;
+  const total = nameBlock + 5 + botBlock + subBlock + iceBlock;
   let y = pad + Math.max(0, (contentH - total) / 2);
 
   const parts: string[] = [];
@@ -136,14 +137,14 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
     );
     y += lineH(name.size) - name.size;
   }
-  y += 6;
+  y += 5;
 
   // Bot caption + name
   y += capH;
   parts.push(
     `<text x="${textX}" y="${y.toFixed(1)}" font-family="${LABEL_FONT_FAMILY}" font-weight="500" font-size="${capH}" letter-spacing="1" fill="${ink}">GROK BOT →</text>`,
   );
-  y += 3 + bot.size;
+  y += 2 + bot.size;
   parts.push(
     `<text x="${textX}" y="${y.toFixed(1)}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="${bot.size}" fill="${ink}">${escapeXml(bot.lines[0] ?? "")}</text>`,
   );
@@ -151,7 +152,7 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
 
   // Title / vibe
   if (sub.lines.length) {
-    y += 5;
+    y += 4;
     for (const line of sub.lines) {
       y += sub.size;
       parts.push(
@@ -162,7 +163,7 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   }
 
   // Icebreaker, separated by a thin rule
-  y += 6;
+  y += 5;
   parts.push(`<rect x="${textX}" y="${y.toFixed(1)}" width="${Math.min(textW, 60)}" height="1.5" fill="${ink}"/>`);
   y += 3;
   for (const line of ice.lines) {
@@ -180,10 +181,10 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   // paint-order stroke+fill: white halo keeps glyphs thick after 1-bit threshold (thermal AA blur fix)
   const footerStroke = `stroke="${paper}" stroke-width="1.25" paint-order="stroke fill" stroke-linejoin="round"`;
   parts.push(
-    `<text x="${pad + 10}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="16" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(EVENT.tag)}</text>`,
+    `<text x="${pad + 10}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="17" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(EVENT.tag)}</text>`,
   );
   parts.push(
-    `<text x="${W - pad - 10}" y="${mainY - 1}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="${legendary ? 700 : 500}" font-size="12" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(tag)}</text>`,
+    `<text x="${W - pad - 10}" y="${mainY - 1}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="${legendary ? 700 : 500}" font-size="13" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(tag)}</text>`,
   );
   if (handshake) {
     parts.push(
@@ -197,10 +198,10 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
 
 /** Prefer the host bot's full name; fall back to initials so the guest's line survives intact. */
 function fitHandshake(text: string, maxWidth: number): Fitted {
-  const full = fitText(`→ ${HOST_BOT}: ${text}`, maxWidth, 11, 9, 1);
+  const full = fitText(`→ ${HOST_BOT}: ${text}`, maxWidth, 12, 10, 1);
   if (!full.lines[0]?.endsWith("…")) return full;
   const initials = HOST_BOT.split(/\s+/).map((w) => w[0]).join("");
-  return fitText(`→ ${initials}: ${text}`, maxWidth, 11, 9, 1);
+  return fitText(`→ ${initials}: ${text}`, maxWidth, 12, 10, 1);
 }
 
 export function shortCode(id: string): string {

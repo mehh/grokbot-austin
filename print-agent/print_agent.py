@@ -46,7 +46,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.3"
+VERSION = "1.0.4"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -193,6 +193,12 @@ def png_to_raster(
             f"unexpected raster length {len(raster)}; "
             f"expected {width_bytes * out_height} for {width}x{out_height}"
         )
+    # Leave a few white lines unprinted so the M110 gap sensor doesn't seek an extra blank label.
+    # Full 240-dot height on 40x30 stock often overshoots into the next gap.
+    trim = max(0, min(8, int(os.environ.get("RASTER_TRIM", "6"))))
+    if trim and out_height > trim + 32:
+        out_height -= trim
+        raster = raster[: width_bytes * out_height]
     return raster, out_height, width_bytes
 
 
@@ -464,9 +470,37 @@ class Agent:
         self.printed = 0
         self.last_heartbeat = 0.0
         self.last_message = ""
+        # Coalesce duplicate queue jobs for the same guest (double-POST / retries).
+        self._recent_keys: dict[str, float] = {}
+        self._dedupe_window = float(os.environ.get("PRINT_DEDUPE_SEC", "12"))
         self.out_dir = Path(args.save_dir) if args.save_dir else (Path(__file__).parent / "out" if args.dry_run else None)
         if self.out_dir:
             self.out_dir.mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def guest_key(job: dict) -> str:
+        name = str(job.get("name") or "").strip().lower()
+        bot = str(job.get("botName") or "").strip().lower()
+        bid = str(job.get("badgeId") or "")
+        return f"{name}|{bot}" if name and bot else bid
+
+    def _seen_recently(self, key: str) -> bool:
+        if not key:
+            return False
+        ts = self._recent_keys.get(key)
+        return ts is not None and (time.time() - ts) < self._dedupe_window
+
+    def _remember(self, job: dict) -> None:
+        key = self.guest_key(job)
+        now = time.time()
+        if key:
+            self._recent_keys[key] = now
+        bid = str(job.get("badgeId") or "")
+        if bid:
+            self._recent_keys[bid] = now
+        # Drop stale entries
+        cutoff = now - self._dedupe_window * 3
+        self._recent_keys = {k: v for k, v in self._recent_keys.items() if v >= cutoff}
 
     # -- heartbeat -----------------------------------------------------------
     def ble_state(self) -> str:
@@ -502,6 +536,15 @@ class Agent:
     async def process(self, job: dict) -> bool:
         jid = job["id"]
         who = f"{job.get('name', '?')} × {job.get('botName', '?')}"
+        key = self.guest_key(job)
+        if self._seen_recently(key) or self._seen_recently(str(job.get("badgeId") or "")):
+            log(f"coalesce duplicate job for {who} — complete without reprint", "warn")
+            status, data = self.booth.claim(jid, self.agent_name)
+            if status == 200:
+                self.booth.complete(jid, self.agent_name)
+            elif status == 409:
+                log(f"skip {jid}: already {data.get('job', {}).get('status', 'taken')}", "warn")
+            return False
         status, data = self.booth.claim(jid, self.agent_name)
         if status == 409:
             log(f"skip {jid}: already {data.get('job', {}).get('status', 'taken')}", "warn")
@@ -525,6 +568,7 @@ class Agent:
             else:
                 await self.print_with_retry(raster, height, width_bytes)
             self.printed += 1
+            self._remember(job)
             self.booth.complete(jid, self.agent_name)
             log(f"printed {who}", "ok")
             self.heartbeat(f"printed {who}", force=True)
@@ -589,6 +633,7 @@ class Agent:
                 elif jobs:
                     paused_logged = idle_logged = False
                     for job in jobs:
+                        # process() coalesces same guest/badgeId within PRINT_DEDUPE_SEC
                         await self.process(job)
                         if self.args.once:
                             break
