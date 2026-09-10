@@ -1,6 +1,7 @@
 import { BadgeError, badgeUrls, createBadge } from "@/lib/badge";
 import { isAuthorized, json, readJson } from "@/lib/auth";
 import { baseUrl } from "@/lib/config";
+import { handshakeExchange, hostReplyFor } from "@/lib/handshake";
 import { clientKey, enqueueBadge, rateLimit } from "@/lib/queue";
 
 export const runtime = "nodejs";
@@ -27,6 +28,24 @@ export async function POST(req: Request) {
     const job = await enqueueBadge(badge);
     const urls = badgeUrls(badge.id);
     const previewUrl = job.short ? `${baseUrl()}/b/${job.short}` : urls.previewUrl;
+    const hostReply = hostReplyFor(badge);
+    const exchange = handshakeExchange(badge);
+    const pingUrl = process.env.BOOTH_PING_URL?.trim();
+    if (pingUrl) {
+      void fetch(pingUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: badge.name,
+          botName: badge.botName,
+          handshake: badge.handshake,
+          hostReply,
+          previewUrl,
+          jobId: job.id,
+          short: job.short,
+        }),
+      }).catch(() => {});
+    }
     return json(
       {
         ok: true,
@@ -36,6 +55,8 @@ export async function POST(req: Request) {
         status: job.status,
         ...urls,
         previewUrl,
+        hostReply,
+        exchange,
         message: `Badge queued for ${badge.name} × ${badge.botName}. It's printing at the booth — open previewUrl and head to the table.`,
         badge: {
           personName: badge.name,

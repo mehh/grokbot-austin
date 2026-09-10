@@ -1,6 +1,7 @@
 import "server-only";
 import { badgeUrls, type Badge } from "./badge";
 import { baseUrl } from "./config";
+import { hostReplyFor } from "./handshake";
 import { ensureShortCode } from "./short";
 import { getStore, type Job } from "./store";
 
@@ -43,6 +44,7 @@ export async function enqueueBadge(badge: Badge): Promise<Job> {
   }
 
   const short = await ensureShortCode(badge.id);
+  const hostReply = hostReplyFor(badge);
   const job: Job = {
     id: jobIdFor(badge),
     badgeId: badge.id,
@@ -50,6 +52,8 @@ export async function enqueueBadge(badge: Badge): Promise<Job> {
     name: badge.name,
     botName: badge.botName,
     title: badge.title,
+    handshake: badge.handshake,
+    hostReply,
     source: badge.source,
     status: "queued",
     createdAt: badge.createdAt || now,

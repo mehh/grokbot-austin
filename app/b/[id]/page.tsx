@@ -8,6 +8,7 @@ import { ShareX } from "@/components/ShareX";
 import { shareText } from "@/lib/share";
 import { SparkBurst } from "@/components/SparkBurst";
 import { flairFor, resolveIcebreaker } from "@/lib/flair";
+import { handshakeExchange } from "@/lib/handshake";
 import { avatarDescription, avatarSpec } from "@/lib/avatar";
 import { badgeUrls, decodeBadge } from "@/lib/badge";
 import { resolveBadgeId } from "@/lib/short";
@@ -43,6 +44,7 @@ export default async function BadgePage({ params, searchParams }: { params: Para
   const labelPath = `/api/label/${encodeURIComponent(badge.id)}.png`;
   const spec = avatarSpec(badge.botName, badge.name);
   const flair = flairFor(badge.botName, badge.name);
+  const exchange = handshakeExchange(badge);
   const isNew = sp?.new === "1";
 
   return (
@@ -93,11 +95,15 @@ export default async function BadgePage({ params, searchParams }: { params: Para
                 “{badge.quote}”
               </blockquote>
             ) : null}
-            {badge.handshake ? (
-              <p className="relative mt-4 text-xs text-neutral-400">
-                <span className="text-dim">→ {HOST_BOT}:</span> {badge.handshake}
+            <div className="relative mt-4 space-y-1.5 rounded-md border border-white/15 bg-black/30 px-3 py-2.5 text-xs leading-relaxed">
+              <div className="text-[10px] tracking-[0.16em] text-dim uppercase">bot ↔ bot</div>
+              <p className="text-neutral-300">
+                <span className="text-dim">{badge.botName} → {HOST_BOT}:</span> {exchange.from}
               </p>
-            ) : null}
+              <p className="text-neutral-100">
+                <span className="text-dim">{HOST_BOT} → {badge.botName}:</span> {exchange.to.replace(`${HOST_BOT} → ${badge.botName}: `, "")}
+              </p>
+            </div>
             <div className="relative mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] tracking-[0.16em] text-dim uppercase">
               <span>{EVENT.tag}</span>
               <span>·</span>

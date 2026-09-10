@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HOST_BOT } from "@/lib/config";
 import { feedLine, flairFor } from "@/lib/flair";
+import { handshakeExchange } from "@/lib/handshake";
 import { Avatar, stateForStatus } from "./Avatar";
 
 interface Job {
@@ -11,6 +12,8 @@ interface Job {
   name: string;
   botName: string;
   title?: string;
+  handshake?: string;
+  hostReply?: string;
   source: "human" | "bot";
   status: "queued" | "printing" | "printed" | "failed";
   createdAt: number;
@@ -176,6 +179,15 @@ export function LiveWall() {
                     <span className={`min-w-0 ${isNew ? "typeout text-white" : "text-neutral-300"}`}>
                       {flair.rarity === "legendary" ? <span className="mr-1 font-bold text-white">★ LEGENDARY</span> : null}
                       {line}
+                      {(() => {
+                        const ex = handshakeExchange({ botName: j.botName, name: j.name, handshake: j.handshake });
+                        const to = j.hostReply || ex.to;
+                        return (
+                          <span className="mt-0.5 block text-[11px] text-dim">
+                            {j.botName}: {ex.from} · {to}
+                          </span>
+                        );
+                      })()}
                     </span>
                   </li>
                 );

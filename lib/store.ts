@@ -12,6 +12,10 @@ export interface Job {
   name: string;
   botName: string;
   title?: string;
+  /** Guest bot handshake line (optional). */
+  handshake?: string;
+  /** Chaos Concierge deterministic reply. */
+  hostReply?: string;
   source: Badge["source"];
   status: JobStatus;
   createdAt: number;

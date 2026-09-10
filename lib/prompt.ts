@@ -32,7 +32,10 @@ Body (JSON):
   "icebreaker": "<ask me about …>"
 }
 
-Step 3 — the response is JSON with "previewUrl" (a short link). Reply to me with that URL and tell me my badge is printing at the booth right now. Two sentences, then stop talking; I have people to meet.
+Step 3 — the response is JSON with "previewUrl" (a short link) and "hostReply" (one line from ${HOST_BOT} back to you). Reply to me with:
+  1) the previewUrl
+  2) one short line showing the bot-to-bot exchange — quote hostReply so I see ${HOST_BOT} answered you
+Tell me my badge is printing at the booth. Three sentences max, then stop; I have people to meet.
 
 Rules: clean, punchy, printable in black and white. Dry beats loud. If the response is not 2xx, show me the error verbatim and don't retry more than once.`;
 }

@@ -97,3 +97,5 @@ export function feedLine(job: { name: string; botName: string; title?: string; s
   if (job.source === "bot") return `${who} ${verb} ${hostBot} on behalf of ${job.name}`;
   return `${job.name} typed ${who} into existence`;
 }
+
+export { hostReplyFor, handshakeExchange } from "./handshake";
