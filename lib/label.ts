@@ -84,16 +84,16 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   const H = opts.height ?? LABEL.height;
   const { ink, paper } = PRINT_COLORS;
 
-  const pad = 10;
+  const pad = 16;
   const flair = flairFor(badge.botName, badge.name);
   const legendary = flair.rarity === "legendary";
   const handshake = badge.handshake ? fitHandshake(badge.handshake, W - pad * 2 - 16) : null;
-  const footerH = handshake ? 42 : 30;
+  const footerH = handshake ? 48 : 36;
   const footerY = H - pad - footerH;
   const contentH = footerY - pad;
 
   // Avatar block on the left.
-  const avatarSize = Math.min(112, contentH);
+  const avatarSize = Math.min(96, contentH);
   const avatarX = pad + 2;
   const avatarY = pad + (contentH - avatarSize) / 2;
   const spec = avatarSpec(badge.botName, badge.name);
@@ -176,16 +176,18 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
   // Footer strip
   const tag = flair.rarityTagPrint;
   parts.push(`<rect x="${pad + (legendary ? 3 : 0)}" y="${footerY}" width="${W - pad * 2 - (legendary ? 6 : 0)}" height="${footerH}" rx="4" fill="${ink}"/>`);
-  const mainY = handshake ? footerY + 19 : footerY + footerH / 2 + 5;
+  const mainY = handshake ? footerY + 22 : footerY + footerH / 2 + 6;
+  // paint-order stroke+fill: white halo keeps glyphs thick after 1-bit threshold (thermal AA blur fix)
+  const footerStroke = `stroke="${paper}" stroke-width="1.25" paint-order="stroke fill" stroke-linejoin="round"`;
   parts.push(
-    `<text x="${pad + 10}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="14" letter-spacing="1" fill="${paper}">${escapeXml(EVENT.tag)}</text>`,
+    `<text x="${pad + 10}" y="${mainY}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="16" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(EVENT.tag)}</text>`,
   );
   parts.push(
-    `<text x="${W - pad - 10}" y="${mainY - 1}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="${legendary ? 700 : 500}" font-size="11" letter-spacing="1" fill="${paper}">${escapeXml(tag)}</text>`,
+    `<text x="${W - pad - 10}" y="${mainY - 1}" text-anchor="end" font-family="${LABEL_FONT_FAMILY}" font-weight="${legendary ? 700 : 500}" font-size="12" letter-spacing="1" fill="${paper}" ${footerStroke}>${escapeXml(tag)}</text>`,
   );
   if (handshake) {
     parts.push(
-      `<text x="${pad + 8}" y="${footerY + footerH - 8}" font-family="${LABEL_FONT_FAMILY}" font-weight="500" font-size="${handshake.size}" fill="${paper}">${escapeXml(handshake.lines[0] ?? "")}</text>`,
+      `<text x="${pad + 8}" y="${footerY + footerH - 9}" font-family="${LABEL_FONT_FAMILY}" font-weight="700" font-size="${handshake.size}" fill="${paper}" ${footerStroke}>${escapeXml(handshake.lines[0] ?? "")}</text>`,
     );
   }
 
@@ -195,10 +197,10 @@ export function labelSvg(badge: Badge, opts: LabelOptions = {}): string {
 
 /** Prefer the host bot's full name; fall back to initials so the guest's line survives intact. */
 function fitHandshake(text: string, maxWidth: number): Fitted {
-  const full = fitText(`→ ${HOST_BOT}: ${text}`, maxWidth, 10, 8, 1);
+  const full = fitText(`→ ${HOST_BOT}: ${text}`, maxWidth, 11, 9, 1);
   if (!full.lines[0]?.endsWith("…")) return full;
   const initials = HOST_BOT.split(/\s+/).map((w) => w[0]).join("");
-  return fitText(`→ ${initials}: ${text}`, maxWidth, 10, 8, 1);
+  return fitText(`→ ${initials}: ${text}`, maxWidth, 11, 9, 1);
 }
 
 export function shortCode(id: string): string {

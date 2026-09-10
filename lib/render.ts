@@ -49,7 +49,7 @@ export function renderLabelBitmap(badge: Badge, opts: RenderOptions = {}): Bitma
     shapeRendering: 2,
   });
   const img = resvg.render();
-  return rgbaToBitmap(img.pixels, img.width, img.height, opts.threshold ?? 140);
+  return rgbaToBitmap(img.pixels, img.width, img.height, opts.threshold ?? 115);
 }
 
 export function renderLabelPng(badge: Badge, opts: RenderOptions = {}): Buffer {
