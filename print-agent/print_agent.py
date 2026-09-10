@@ -7,7 +7,7 @@ Runs on the booth laptop. Polls the web app for queued badges, downloads each
 is on by default; pause it from the /booth dashboard.
 
 Feed safety (v1.0.6): PNG height is ground truth — never letterbox a shorter PNG
-onto a taller canvas. Gap media (MEDIA=0x0a) applies SAFE_GAP_DOTS (default 24)
+onto a taller canvas. Gap media (MEDIA=0x0a) applies SAFE_GAP_DOTS (default 8)
 so a 40×20 / 320×160 job sends ≤136 lines and does not span the next label.
 Trailing all-white rows are stripped after packing. RASTER_TRIM defaults to 0.
 Disconnect after footer counts as success; PRINT_ATTEMPTS defaults to 1.
@@ -17,7 +17,7 @@ Disconnect after footer counts as success; PRINT_ATTEMPTS defaults to 1.
     export PHOMEMO_ADDR=q450E5CQ7550085      # BLE name (serial) or MAC/UUID
     export LABEL=40x20
     export MEDIA=0x0a                       # 0x0a gap labels · 0x0b continuous
-    export SAFE_GAP_DOTS=24
+    export SAFE_GAP_DOTS=8
     python3 print_agent.py
 
 Options:
@@ -55,7 +55,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "1.0.7"
+VERSION = "1.0.8"
 
 DEFAULT_URL = "https://grokbotaustin.vercel.app"
 DEFAULT_TOKEN = "austin-gtm-2026"
@@ -96,7 +96,7 @@ MEDIA_GAP = 0x0A
 MEDIA_CONTINUOUS = 0x0B
 # Leave this many dots unused at the bottom of gap stock so the head does not
 # overrun into the next label before the gap sensor re-syncs.
-SAFE_GAP_DOTS = max(0, int(os.environ.get("SAFE_GAP_DOTS", "24")))
+SAFE_GAP_DOTS = max(0, int(os.environ.get("SAFE_GAP_DOTS", "8")))
 # Optional blind trim after white-strip + safe-gap (default off — prefer those).
 RASTER_TRIM = max(0, int(os.environ.get("RASTER_TRIM", "0")))
 PRINT_ATTEMPTS = max(1, int(os.environ.get("PRINT_ATTEMPTS", "1")))
@@ -861,7 +861,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--addr", default=os.environ.get("PHOMEMO_ADDR", DEFAULT_ADDR), help="printer BLE name/serial or MAC/UUID (PHOMEMO_ADDR)")
     p.add_argument("--label", default=os.environ.get("LABEL", "40x20"), help="label size in mm, e.g. 40x20")
     p.add_argument("--density", type=int, default=int(os.environ.get("DENSITY", "15")), help="1..15")
-    p.add_argument("--speed", type=int, default=int(os.environ.get("SPEED", "5")), help="1..5")
+    p.add_argument("--speed", type=int, default=int(os.environ.get("SPEED", "2")), help="1..5 (2=slower/denser solids)")
     p.add_argument("--threshold", type=int, default=128, help="gray → black cutoff (0..255)")
     p.add_argument("--interval", type=float, default=float(os.environ.get("POLL_INTERVAL", "2.5")), help="poll seconds")
     p.add_argument("--save-dir", default=os.environ.get("SAVE_DIR"), help="also save every label PNG here")
