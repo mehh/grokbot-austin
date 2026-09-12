@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@resvg/resvg-js"],
   outputFileTracingIncludes: {
     "/api/label/[file]": ["./public/fonts/**/*"],
+    // The OG image is prerendered at build, but keep its two fonts traced (explicit files only,
+    // never `public/**`) so it still renders if the route ever runs on demand.
+    "/opengraph-image": ["./public/fonts/GeistMono-Bold.ttf", "./public/fonts/GeistMono-Regular.ttf"],
   },
   async headers() {
     return [

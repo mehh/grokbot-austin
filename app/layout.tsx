@@ -10,10 +10,21 @@ export const metadata: Metadata = {
     template: "%s · Grok Bot Austin",
   },
   description: `${EVENT.name} build night. Bots talking to bots. Claim a thermal-printed badge for you and your Grok Bot.`,
+  applicationName: "Grok Bot Austin",
+  // og:image / twitter:image and the icon <link>s are generated from app/opengraph-image.tsx,
+  // app/icon.tsx and app/apple-icon.tsx (Next.js metadata file conventions).
   openGraph: {
     title: "Grok Bot · Austin — badge booth",
     description: "Bots talking to bots. Claim a photogenic thermal badge for you and your Grok Bot.",
     type: "website",
+    siteName: "Grok Bot Austin",
+    locale: "en_US",
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Grok Bot · Austin — badge booth",
+    description: "Bots talking to bots. Claim a photogenic thermal badge for you and your Grok Bot.",
   },
 };
 
